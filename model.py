@@ -69,7 +69,7 @@ class Economy(mesa.Model):
             buffer:int = 0.1,
             init_wage_r = 0.1,
             lower_wage_r = 0.1,
-            ):
+        ):
         # Initialize the parent class with relevant parameters.
         super().__init__(seed=seed)
         # Parameters.
@@ -166,6 +166,7 @@ class Economy(mesa.Model):
                 }
             }
         )
+
     def end(self):
         if self.steps % self.days_in_month == 0:
             return True
@@ -331,7 +332,8 @@ class Household(mesa.Agent):
         We know that price should be a function of 'marginal cost', which is not defined in the paper. The marginal cost of 63 goods is the wage, so let us assume the marginal cost of one good is wage/63. We know that 63*price (which is 1)/price_low is the ceiling wage; if divided by price_high, it's the floor wage. So we take the average of the two and use that as the denominator.
         We can add noise to each agent's attributes, but the mean should be this. 
         '''
-        self.money = self.wage_r
+        # DEBUG
+        self.money = self.wage_r*10
         self.model.counter += 1
     def initialize_reservation(self, init_wage_r, tech_param, days_in_month):
         if init_wage_r > 0.6:
@@ -444,12 +446,13 @@ class Household(mesa.Agent):
                 seller.fulfilled_demand += quantity
                 consumed += quantity
                 dollars_transacted = quantity * seller.price
-                self.money -= min(dollars_transacted, self.money)
+                payment = min(dollars_transacted, self.money)
+                self.money -= payment
                 if self.money < 0:
                     raise TypeError(
                         f"Money is negative (${self.money}) and should not be the case."
                         )
-                seller.money += dollars_transacted
+                seller.money += payment
                 firms_visited += 1
                 if( 
                     (consumed/self.day_consume >= 0.95) 
@@ -511,7 +514,7 @@ class Firm(mesa.Agent):
         if self.inventory < self.fulfilled_demand * inventory_low:
             self.opening = 1
             self.model.counter += 1
-            if (self.price < self.wage * price_low) & incdf(price_chg_prob):
+            if (self.price < self.wage/63 * price_low) & incdf(price_chg_prob):
                 adjustment = random.uniform(0, max_price_chg)
                 self.price = self.price * (1 + adjustment)
         if self.inventory > self.fulfilled_demand * inventory_high:
@@ -519,7 +522,7 @@ class Firm(mesa.Agent):
             self.model.counter += 1
             if len(self.employees) > 0:
                 self.planned_firing = True
-            if (self.price > self.wage * price_high) & incdf(price_chg_prob):
+            if (self.price > self.wage/63 * price_high) & incdf(price_chg_prob):
                 adjustment = random.uniform(0, max_price_chg)
                 self.price = self.price * (1 - adjustment)
     def fire(self):

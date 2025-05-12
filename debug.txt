@@ -8,6 +8,7 @@
 - price adjustment is fucked. it’s always too low. marginal cost is wage/21
 - inventory was not being deducted.
 
+- money creation is fucked
 - planning (vacancy creation) is fucked
 - demand tracking is fucked?
 - examine path dependence of firm plans and unintentional concentration
