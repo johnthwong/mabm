@@ -294,11 +294,16 @@ class Economy(mesa.Model):
         
         # End of month activities.
         if self.end():
-            print("Running: do_finances")
-            self.agents_by_type[Firm].do("do_finances", buffer=self.buffer)
+            print("Running: pay_employees")
+            self.agents_by_type[Firm].do("pay_employees", buffer=self.buffer)
             print(f"Counter: {self.counter}")
             self.counter = 0
             
+            print("Running: pay_shareholders")
+            self.agents_by_type[Firm].do("pay_shareholders")
+            print(f"Counter: {self.counter}")
+            self.counter = 0
+
             print("Running: adjust_reservation")
             self.agents_by_type[Household].do(
                 "adjust_reservation", lower_wage_r = self.lower_wage_r
@@ -421,6 +426,8 @@ class Household(mesa.Agent):
     def budget(self, aversion, S, days_in_month):
         total_price = sum(seller.price for seller in self.sellers)
         avg_price = total_price/S
+        if self.money < 0:
+            raise ValueError("A household has negative money balance.")
         if self.money > avg_price:
             self.day_consume = (self.money/avg_price)/days_in_month
         else:
@@ -486,6 +493,7 @@ class Firm(mesa.Agent):
         self.money = 0
         self.month_output = 0
         self.planned_firing = False
+        self.retained = 0
     def initialize_price_wage(self, tech_param, days_in_month, price_low, price_high):
         # See Household.initialize_money() for explanation.
         self.price=1
@@ -500,7 +508,9 @@ class Firm(mesa.Agent):
             self.model.counter += 1
         # Check if the last x months have had no openings:
         if self.opening_hist[-slack:] == [0]*slack:
-            self.wage = self.wage*(1 - wage_chg)
+            self.wage = max(self.wage*(1 - wage_chg), 1e-9)
+            if self.wage < 0:
+                raise ValueError("Wage adjusted to negative value.")
             self.model.counter += 1
     def plan(
             self, 
@@ -524,7 +534,9 @@ class Firm(mesa.Agent):
                 self.planned_firing = True
             if (self.price > self.wage/63 * price_high) & incdf(price_chg_prob):
                 adjustment = random.uniform(0, max_price_chg)
-                self.price = self.price * (1 - adjustment)
+                self.price = max(self.price * (1 - adjustment), 1e-9)
+                if self.price < 0:
+                    raise ValueError("Price adjusted to negative value.")
     def fire(self):
         if self.planned_firing:
             fired = random.choice(self.employees)
@@ -542,32 +554,52 @@ class Firm(mesa.Agent):
         self.month_output = 0
         self.fulfilled_demand = 0
         self.model.counter += 1
-    def do_finances(self, buffer, ownership="sovereign"):
-        '''
-        Firms do three things. 
-        1. Pay employees.
-        2. Pay shareholders.
-        3. The rest is retained profits.
-        '''
+    def pay_employees(self, buffer):
         # Pay employees.
         employee_count = len(self.employees)
         wage_bill = employee_count * self.wage
         if employee_count > 0:
             wages_paid = min(wage_bill, self.money)
-            payment = wages_paid/employee_count
-            for employee in self.employees:
+            total_paid = 0
+            for i, employee in enumerate(self.employees):
+                if i == len(self.employees) - 1:
+                    # Last employee gets remainder to ensure exact balance
+                    payment = max(wages_paid - total_paid, 0)
+                    # DEBUG
+                    print("paying last employee")
+                else:
+                    payment = wages_paid/employee_count
+                    total_paid += payment
+                    # DEBUG
+                    print("paying not-last employee")
                 employee.money += payment
+                if employee.money < 0:
+                    raise ValueError("Money is negative after wage pmt.")
                 employee.paystub = payment
+            self.money -= wages_paid
+        self.retained = min(wage_bill * buffer, self.money)
+        self.model.counter += 1
+    def pay_shareholders(self):
         # Pay shareholders.
-        dividends = max(self.money - (1 + buffer) * wage_bill, 0)
+        dividends = max(self.money - self.retained, 0)
         if dividends > 0:
-            if ownership == "sovereign":
-                owners = self.model.agents_by_type[Household]
-                equities = [owner.money for owner in owners]
-                equity = sum(equities)
-                if equity > 0:
-                    for shareholder in owners:
+            owners = self.model.agents_by_type[Household]
+            equities = [owner.money for owner in owners]
+            equity = sum(equities)
+            total_distributed = 0
+            if equity > 0:
+                for i, shareholder in enumerate(owners):
+                    if i == len(owners) - 1:
+                        # Last shareholder gets remainder to ensure exact balance
+                        share_amount = max(dividends - total_distributed, 0)
+                        print("paying last shareholder")
+                    else:
                         share = shareholder.money/equity
-                        shareholder.money += share * dividends
+                        share_amount = share * dividends
+                        total_distributed += share_amount
+                    shareholder.money += share_amount
+                    if shareholder.money < 0:
+                        raise ValueError("Money is negative after dividend pmt.")
         self.money -= dividends
+
         self.model.counter += 1
