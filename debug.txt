@@ -9,8 +9,10 @@
 - inventory was not being deducted.
 - money creation is fucked
 - demand tracking is fucked?
-- planning (vacancy creation) is fucked?
+- planning (vacancy creation) is fucked
 - swap for reliability only after one month? (>21 ticks)
+- fix ordering of swapping sellers
+- more jobs than people
 
 - examine path dependence of firm plans and unintentional concentration
-- fix ordering of swapping sellers
+
