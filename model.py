@@ -161,7 +161,8 @@ class Economy(mesa.Model):
                     "price":lambda a: a.price,
                     "employees": lambda a: len(a.employees),
                     "demand": lambda a: a.fulfilled_demand,
-                    'vacancies': lambda a: a.opening
+                    'vacancies': lambda a: a.opening,
+                    'inventory': lambda a: a.inventory,
                 }
             }
         )
@@ -189,15 +190,16 @@ class Economy(mesa.Model):
                 raise ValueError("Counter too low.")
             self.counter = 0
             
+            print("Running: set_wage")
+            self.agents_by_type[Firm].do(
+                "set_wage", 
+                max_wage_chg = self.max_wage_chg,
+                slack = self.slack,
+                )
+            print(f"Counter: {self.counter}")
+            self.counter = 0
+            
             if self.steps > 1:
-                print("Running: set_wage")
-                self.agents_by_type[Firm].do(
-                    "set_wage", 
-                    max_wage_chg = self.max_wage_chg,
-                    slack = self.slack,
-                    )
-                print(f"Counter: {self.counter}")
-                self.counter = 0
 
                 print("Running: fire")
                 self.agents_by_type[Firm].do("fire")
@@ -331,8 +333,8 @@ class Household(mesa.Agent):
         '''
         real_output_per_capita = tech_param * days_in_month
         self.money = np.random.normal(
-            real_output_per_capita, 
-            real_output_per_capita*1e-1
+            100, 
+            100*1e-1
             )
         self.model.counter += 1
     def initialize_reservation(self, init_wage_r, tech_param, days_in_month):
@@ -474,7 +476,7 @@ class Firm(mesa.Agent):
         '''
         self.price = 1 
         self.wage = None
-        self.opening = True
+        self.opening = float('inf')
         self.opening_hist = []
         self.inventory = 0
         self.employees = []
@@ -484,9 +486,9 @@ class Firm(mesa.Agent):
         self.planned_firing = False
     def initialize_price_wage(self, tech_param, days_in_month, price_low, price_high):
         # See Household.initialize_money() for explanation.
-        self.price=np.random.normal(1, 1e-1)
+        self.price=1
         real_output_per_capita = tech_param * days_in_month
-        price_per_mc = random.uniform(price_low, price_high)
+        price_per_mc = random.uniform(1, 5)
         self.wage = self.price * real_output_per_capita / price_per_mc
         self.model.counter += 1
     def set_wage(self, max_wage_chg, slack):
@@ -509,7 +511,7 @@ class Firm(mesa.Agent):
             max_price_chg,
             ):
         if self.inventory < self.fulfilled_demand * inventory_low:
-            self.opening = True
+            self.opening = 1
             self.model.counter += 1
             if (self.price < self.wage * price_low) & incdf(price_chg_prob):
                 adjustment = random.uniform(0, max_price_chg)
@@ -518,12 +520,16 @@ class Firm(mesa.Agent):
             self.opening = False
             self.model.counter += 1
             if len(self.employees) > 0:
-                fired = random.choice(self.employees)
-                self.employees.remove(fired)
-                fired.employer = None
+                self.planned_firing = True
             if (self.price > self.wage * price_high) & incdf(price_chg_prob):
                 adjustment = random.uniform(0, max_price_chg)
                 self.price = self.price * (1 - adjustment)
+    def fire(self):
+        if self.planned_firing:
+            fired = random.choice(self.employees)
+            self.employees.remove(fired)
+            fired.employer = None
+            self.planned_firing = False
     def produce(self, tech_param:float, tech_type="linear"):
         if tech_type == "linear":
             output = tech_param * len(self.employees)
