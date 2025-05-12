@@ -491,7 +491,6 @@ class Firm(mesa.Agent):
             output = tech_param * len(self.employees)
         self.inventory += output
         self.month_output += output
-        if output > 0:
             
     def reset_monthly_stats(self):
         self.month_output = 0
