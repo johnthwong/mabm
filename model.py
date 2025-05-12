@@ -338,7 +338,7 @@ class Household(mesa.Agent):
         We can add noise to each agent's attributes, but the mean should be this. 
         '''
         # DEBUG
-        self.money = 1
+        self.money = self.wage_r*10
         self.model.counter += 1
     def initialize_reservation(self, init_wage_r, tech_param, days_in_month):
         if init_wage_r > 0.6:
