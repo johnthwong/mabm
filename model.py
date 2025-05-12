@@ -67,7 +67,7 @@ class Economy(mesa.Model):
             aversion = 0.9,
             browse = 7,
             buffer:int = 0.1,
-            init_wage_r = 0.1,
+            init_wage_r = 0.25,
             lower_wage_r = 0.1,
             ):
         # Initialize the parent class with relevant parameters.
@@ -110,6 +110,32 @@ class Economy(mesa.Model):
             raise ValueError("Counter too low.")
         self.counter = 0
         
+        # Initialize money.
+        print("Running: initialize_money")
+        self.agents_by_type[Household].do(
+            "initialize_money",
+            tech_param = self.tech_param, 
+            days_in_month = self.days_in_month,
+            )
+        print(f"Counter: {self.counter}")
+        if self.counter < self.H:
+            raise ValueError("Counter too low.")
+        self.counter = 0
+        
+        # Initialize price and wages.
+        print("Running: initialize_price_wage")
+        self.agents_by_type[Firm].do(
+            "initialize_price_wage",
+            tech_param = self.tech_param, 
+            days_in_month = self.days_in_month, 
+            price_low = self.price_low, 
+            price_high = self.price_high,
+            )
+        print(f"Counter: {self.counter}")
+        if self.counter < self.F:
+            raise ValueError("Counter too low.")
+        self.counter = 0
+        
         # Initialize reservation wage.
         print("Running: initialize_reservation")
         self.agents_by_type[Household].do(
@@ -120,27 +146,6 @@ class Economy(mesa.Model):
             )
         print(f"Counter: {self.counter}")
         if self.counter < self.H:
-            raise ValueError("Counter too low.")
-        self.counter = 0
-        
-        # Give households reservation wage.
-        print("Running: earn_reservation")
-        self.agents_by_type[Household].do("earn_reservation")
-        print(f"Counter: {self.counter}")
-        if self.counter < self.H:
-            raise ValueError("Counter too low.")
-        self.counter = 0
-        
-        # Initialize wages.
-        print("Running: initialize_wage")
-        self.agents_by_type[Firm].do(
-            "initialize_wage",
-            init_wage_r=self.init_wage_r, 
-            tech_param=self.tech_param, 
-            days_in_month=self.days_in_month,
-            )
-        print(f"Counter: {self.counter}")
-        if self.counter < self.F:
             raise ValueError("Counter too low.")
         self.counter = 0
         
@@ -299,11 +304,23 @@ class Household(mesa.Agent):
         self.blacklist = []
         self.day_consume = 0
         self.paystub = 0
+    def initialize_money(self, tech_param, days_in_month):
+        '''
+        This model is extremely sensitive to initial nominal conditions.
+        There are three variables to deliberately initialize: price, money, and wage.
+        Let us assume that each dollar initially represents one unit of consumption good. This still allows the nominal to diverge from the real emergently, but we just assume the two are the same for now. This exogenous assumption can imply stable values for the other two.
+        We know that each worker produces 3*21 goods---and that this needs to somewhat clear. Thus, each worker should have 63 dollars. Call this their endowed wealth.
+        We know that price should be a function of 'marginal cost', which is not defined in the paper. The marginal cost of 63 goods is the wage, so let us assume the marginal cost of one good is wage/63. We know that 63*price (which is 1)/price_low is the ceiling wage; if divided by price_high, it's the floor wage. So we take the average of the two and use that as the denominator.
+        We can add noise to each agent's attributes, but the mean should be this. 
+        '''
+        real_output_per_capita = tech_param * days_in_month
+        self.money = np.random.normal(
+            real_output_per_capita, 
+            real_output_per_capita*1e-1
+            )
+        self.model.counter += 1
     def initialize_reservation(self, init_wage_r, tech_param, days_in_month):
-        '''
-        Initial reservation wage determines the money supply in the economy. If this is not parameterized correctly, there will be no consumer demand and the economy will crash. We give each household the per-capita output of the economy, which is determined as tech_param*21*price. Thus, we assume workers start from equality. But this also implies that when a household is unemployed, they will initially earn tech_param*21, which is an airdrop of inflation-unadjusted per-capita output.
-        '''
-        if init_wage_r > 0.7:
+        if init_wage_r > 0.6:
             raise Warning("Initial reservation wage might be too high.")
         self.wage_r = init_wage_r * tech_param * days_in_month
         self.model.counter += 1
@@ -317,13 +334,12 @@ class Household(mesa.Agent):
         self.sellers = sellers
         self.blacklist = [0]*S
         self.model.counter += 1
-    def earn_reservation(self):
-        if self.wage_r is None:
-            raise ValueError("Reservation wage is not intitialized.")
+    def update_employment_hist(self):
         if self.employer is None:
-            self.money += self.wage_r
-            self.paystub = self.wage_r
-            self.model.counter += 1
+            self.employment_hist.append(0)
+        else:
+            self.employment_hist.append(1)
+        self.model.counter += 1
     def swap_for_reliability(self, swap_for_reliability_prob):
         if sum(self.blacklist) > 0:
             if incdf(swap_for_reliability_prob):
@@ -398,12 +414,13 @@ class Household(mesa.Agent):
                 seller.demand += demand
                 max_sellable = seller.inventory
                 if demand > max_sellable:
-                    consumed += max_sellable
-                    dollars_transacted = max_sellable * seller.price
+                    quantity = max_sellable
                     self.blacklist[seller_index] = 1
                 else:
-                    consumed += demand
-                    dollars_transacted = demand * seller.price
+                    quantity = demand
+                seller.inventory -= quantity
+                consumed += quantity
+                dollars_transacted = quantity * seller.price
                 self.money -= min(dollars_transacted, self.money)
                 if self.money < 0:
                     raise TypeError(
@@ -442,13 +459,13 @@ class Firm(mesa.Agent):
         self.demand = 0
         self.money = 0
         self.month_output = 0
-    def initialize_wage(self, init_wage_r, tech_param, days_in_month):
-        '''
-        Wage needs to be initialized because it determines whether initial unemployment search will result in pairings. For this to work, initial wages is labor share of monthly output. (Note that wage is monthly.) Labor share is stochastically determined but is on average higher than reservation wage.
-        '''
-        labor_share_mean = min(init_wage_r + 0.2, 1)
-        labor_share = np.random.normal(labor_share_mean, scale=0.1)
-        self.wage = labor_share * tech_param * days_in_month
+        self.planned_firing = False
+    def initialize_price_wage(self, tech_param, days_in_month, price_low, price_high):
+        # See Household.initialize_money() for explanation.
+        self.price=np.random.normal(1, 1e-1)
+        real_output_per_capita = tech_param * days_in_month
+        price_per_mc = random.uniform(price_low, price_high)
+        self.wage = self.price * real_output_per_capita / price_per_mc
         self.model.counter += 1
     def set_wage(self, max_wage_chg, slack):
         self.opening_hist.append(self.opening)
