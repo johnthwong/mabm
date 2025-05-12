@@ -338,7 +338,7 @@ class Household(mesa.Agent):
         We can add noise to each agent's attributes, but the mean should be this. 
         '''
         # DEBUG
-        self.money = self.wage_r*10
+        self.money = 1
         self.model.counter += 1
     def initialize_reservation(self, init_wage_r, tech_param, days_in_month):
         if init_wage_r > 0.6:
@@ -565,13 +565,9 @@ class Firm(mesa.Agent):
                 if i == len(self.employees) - 1:
                     # Last employee gets remainder to ensure exact balance
                     payment = max(wages_paid - total_paid, 0)
-                    # DEBUG
-                    print("paying last employee")
                 else:
                     payment = wages_paid/employee_count
                     total_paid += payment
-                    # DEBUG
-                    print("paying not-last employee")
                 employee.money += payment
                 if employee.money < 0:
                     raise ValueError("Money is negative after wage pmt.")
