@@ -181,30 +181,18 @@ class Economy(mesa.Model):
             self.record_month()
         
             # Households recall whether they were employed last month.
-            print("Running: update_employment_hist")
             self.agents_by_type[Household].do("update_employment_hist")
-            print(f"Counter: {self.counter}")
-            if self.counter < self.H:
-                raise ValueError("Counter too low.")
-            self.counter = 0
-            
-            print("Running: set_wage")
+            # Firms set wages.
             self.agents_by_type[Firm].do(
                 "set_wage", 
                 max_wage_chg = self.max_wage_chg,
                 slack = self.slack,
                 )
-            print(f"Counter: {self.counter}")
-            self.counter = 0
-            
-            if self.steps > 1: # already conditional on start of month
-
-                print("Running: fire")
+            # Only run this after the first month.
+            if self.steps > 1:
+                # Firms execute planned firing.
                 self.agents_by_type[Firm].do("fire")
-                print(f"Counter: {self.counter}")
-                self.counter = 0
-            
-                print("Running: plan")
+                # Firms sets inputs and prices.
                 self.agents_by_type[Firm].do(
                     "plan", 
                     inventory_low = self.inventory_low,
@@ -214,100 +202,58 @@ class Economy(mesa.Model):
                     price_chg_prob = self.price_chg_prob,
                     max_price_chg = self.max_price_chg,
                     )
-                print(f"Counter: {self.counter}")
-                self.counter = 0
-                
-                print("Running: swap_for_price")
+                # Households search for cheaper sellers (firms).
                 self.agents_by_type[Household].shuffle_do(
                     "swap_for_price",
                     swap_for_price_prob = self.swap_for_price_prob,
                     min_savings = self.min_savings,
                 )
-                print(f"Counter: {self.counter}")
-                self.counter = 0
-            
-                print("Running: swap_for_reliability")
+                # Households search for sellers (firms) with more inventory.
                 self.agents_by_type[Household].shuffle_do(
                     "swap_for_reliability",
                     swap_for_reliability_prob = self.swap_for_reliability_prob,
                 )
-                print(f"Counter: {self.counter}")
-                self.counter = 0
-                
-                print("Running: reset_blacklist")
+                # Households reset their memory of which sellers had no stock.
                 self.agents_by_type[Household].do(
                     "reset_blacklist", S = self.S
                     )
-                print(f"Counter: {self.counter}")
-                self.counter = 0
-                
-            print("Running: unemployed_search")
+            # Households search for jobs if unemployed.
             self.agents_by_type[Household].shuffle_do(
                 "unemployed_search", 
                 applys = self.applys
                 )
-            print(f"Counter: {self.counter}")
-            self.counter = 0
-            
-            print("Running: employed_search")
+            # Households search for higher paying jobs if underpaid.
             self.agents_by_type[Household].shuffle_do(
                 "employed_search", 
                 quit_prob = self.quit_prob
                 )
-            print(f"Counter: {self.counter}")
-            self.counter = 0
-            
-            print("Running: budget")
+            # Households plan consumption.
             self.agents_by_type[Household].do(
                 "budget", 
                 aversion=self.aversion, 
                 S=self.S,
                 days_in_month=self.days_in_month
                 )
-            print(f"Counter: {self.counter}")
-            self.counter = 0
-            
-            print("Running: reset_monthly_stats")
+            # Firms reset their monthly statistics.
             self.agents_by_type[Firm].do("reset_monthly_stats")
-            print(f"Counter: {self.counter}")
-            self.counter = 0
-            
         # Daily activities.
-        print("Running: buy")
+        # Households buy from firms to consume.
         self.agents_by_type[Household].shuffle_do(
             "buy", browse=self.browse
             )
-        print(f"Counter: {self.counter}")
-        if self.counter == 0:
-            raise ValueError("Counter too low.")
-        self.counter = 0
-        
-        print("Running: produce")
+        # Firms then produce.
         self.agents_by_type[Firm].do("produce", tech_param=self.tech_param)
-        print(f"Counter: {self.counter}")
-        if self.counter == 0:
-            raise ValueError("Counter too low.")
-        self.counter = 0
-        
         # End of month activities.
         if self.end():
-            print("Running: pay_employees")
+            # Firms pay employees (households).
             self.agents_by_type[Firm].do("pay_employees", buffer=self.buffer)
-            print(f"Counter: {self.counter}")
-            self.counter = 0
-            
-            print("Running: pay_shareholders")
+            # Firms pay shareholders (households).
             self.agents_by_type[Firm].do("pay_shareholders")
-            print(f"Counter: {self.counter}")
-            self.counter = 0
-
-            print("Running: adjust_reservation")
+            # Households update their reservation wage.
             self.agents_by_type[Household].do(
                 "adjust_reservation", lower_wage_r = self.lower_wage_r
                 )
-            print(f"Counter: {self.counter}")
-            self.counter = 0
-            
+            # Run datacollector at end of month (every 21st day).
             self.datacollector.collect(self)
 class Household(mesa.Agent):
     # This is a singleton household.
@@ -327,12 +273,12 @@ class Household(mesa.Agent):
         self.paystub = 0
     def initialize_money(self):
         self.money = 1e4
-        self.model.counter += 1
+        
     def initialize_reservation(self, init_wage_r, tech_param, days_in_month):
         if init_wage_r > 0.6:
             raise Warning("Initial reservation wage might be too high.")
         self.wage_r = init_wage_r * tech_param * days_in_month
-        self.model.counter += 1
+        
     def assign_firms(self, S):
         # Assign seller firm relationships to households.
         all_firms = self.model.agents_by_type[Firm]
@@ -342,7 +288,7 @@ class Household(mesa.Agent):
         sellers = random.sample(all_firms, S)
         self.sellers = sellers
         self.blacklist = [0]*S
-        self.model.counter += 1
+        
     def update_employment_hist(self):
         if self.employer is None:
             self.employment_hist.append(0)
@@ -350,7 +296,7 @@ class Household(mesa.Agent):
             self.employment_hist.append(1)
         # Debug:
         # print(f"{self.unique_id}'s employment hist: {self.employment_hist}")
-        self.model.counter += 1
+        
     def swap_for_reliability(self, swap_for_reliability_prob):
         if sum(self.blacklist) > 0:
             if incdf(swap_for_reliability_prob):
@@ -363,7 +309,7 @@ class Household(mesa.Agent):
                 new_seller = random.choice(new_sellers)
                 self.sellers.remove(old_seller)
                 self.sellers.append(new_seller)
-                self.model.counter += 1
+                
     def swap_for_price(self, swap_for_price_prob, min_savings):
         if incdf(swap_for_price_prob):
             old_seller_index = random.randint(0, len(self.sellers)-1)
@@ -379,10 +325,10 @@ class Household(mesa.Agent):
                     # Update blacklist
                     del self.blacklist[old_seller_index]
                     self.blacklist.append(0)
-                    self.model.counter += 1
+                    
     def reset_blacklist(self, S):
         self.blacklist = [0]*S
-        self.model.counter += 1
+        
     def unemployed_search(self, applys):
         if (self.employment_hist[-1] == 0) & (self.employer is None):
             firms_applied = random.sample(
@@ -397,7 +343,7 @@ class Household(mesa.Agent):
                         firm.employees.append(self)
                         # Close the opening
                         firm.opening -= 1
-                        self.model.counter += 1
+                        
                         break
     def employed_search(self, quit_prob):
         if self.employment_hist[-1] == 1:
@@ -419,7 +365,7 @@ class Household(mesa.Agent):
                         new_employer.employees.append(self)
                         # Close the opening
                         new_employer.opening -= 1
-                        self.model.counter += 1
+                        
     def budget(self, aversion, S, days_in_month):
         total_price = sum(seller.price for seller in self.sellers)
         avg_price = total_price/S
@@ -429,7 +375,7 @@ class Household(mesa.Agent):
             self.day_consume = (self.money/avg_price)/days_in_month
         else:
             self.day_consume = pow(self.money/avg_price, aversion)/days_in_month
-        self.model.counter += 1
+        
     def buy(self, browse):
         if self.day_consume > 0:
             self.shuffle_index = list(range(len(self.sellers)))
@@ -463,15 +409,15 @@ class Household(mesa.Agent):
                     or (firms_visited >= browse)
                     or (self.money == 0)
                 ):
-                    self.model.counter += 1
+                    
                     break
     def adjust_reservation(self, lower_wage_r):
         if (self.employment_hist[-1] == 1) & (self.paystub > self.wage_r):
             self.wage_r = self.paystub
-            self.model.counter += 1
+            
         if (self.employment_hist[-1] == 0):
             self.wage_r = (1 - lower_wage_r) * self.wage_r
-            self.model.counter += 1
+            
 class Firm(mesa.Agent):
     def __init__(self, model):
         # Initialize the parent class with relevant parameters.
@@ -495,19 +441,19 @@ class Firm(mesa.Agent):
         self.price=1
         real_output_per_capita = tech_param * days_in_month
         self.wage = max(np.random.normal(0.3, 0.1), 0) * real_output_per_capita
-        self.model.counter += 1
+        
     def set_wage(self, max_wage_chg, slack):
         self.opening_hist.append(self.opening)
         wage_chg = random.uniform(0, max_wage_chg)
         if self.opening_hist[-1] > 0:
             self.wage = self.wage*(1 + wage_chg)
-            self.model.counter += 1
+            
         # Check if the last x months have had no openings:
         if self.opening_hist[-slack:] == [0]*slack:
             self.wage = max(self.wage*(1 - wage_chg), 1e-9)
             if self.wage < 0:
                 raise ValueError("Wage adjusted to negative value.")
-            self.model.counter += 1
+            
     def plan(
             self, 
             inventory_low, 
@@ -519,13 +465,13 @@ class Firm(mesa.Agent):
             ):
         if self.inventory < self.fulfilled_demand * inventory_low:
             self.opening = 1
-            self.model.counter += 1
+            
             if (self.price < self.wage/63 * price_low) & incdf(price_chg_prob):
                 adjustment = random.uniform(0, max_price_chg)
                 self.price = self.price * (1 + adjustment)
         if self.inventory > self.fulfilled_demand * inventory_high:
             self.opening = 0
-            self.model.counter += 1
+            
             if len(self.employees) > 0:
                 self.planned_firing = True
             if (self.price > self.wage/63 * price_high) & incdf(price_chg_prob):
@@ -546,11 +492,11 @@ class Firm(mesa.Agent):
         self.inventory += output
         self.month_output += output
         if output > 0:
-            self.model.counter += 1
+            
     def reset_monthly_stats(self):
         self.month_output = 0
         self.fulfilled_demand = 0
-        self.model.counter += 1
+        
     def pay_employees(self, buffer):
         # Pay employees.
         employee_count = len(self.employees)
@@ -571,7 +517,7 @@ class Firm(mesa.Agent):
                 employee.paystub = payment
             self.money -= wages_paid
         self.retained = min(wage_bill * buffer, self.money)
-        self.model.counter += 1
+        
     def pay_shareholders(self):
         # Pay shareholders.
         dividends = max(self.money - self.retained, 0)
@@ -593,5 +539,3 @@ class Firm(mesa.Agent):
                     if shareholder.money < 0:
                         raise ValueError("Money is negative after dividend pmt.")
         self.money -= dividends
-
-        self.model.counter += 1
