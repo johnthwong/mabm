@@ -1,0 +1,15 @@
+- reservation wage is too low.
+- if reservation wage adjusts, are workers making their old wage when laid off?
+- households are not receiving reservation wage after start. wait they’re not supposed to.
+- unemployment lag.
+- adjust reservation for lagged month.
+- close job openings after hiring.
+- collect firm size data
+- price adjustment is fucked. it’s always too low. marginal cost is wage/21
+- inventory was not being deducted.
+
+- planning (vacancy creation) is fucked
+- demand tracking is fucked?
+- examine path dependence of firm plans and unintentional concentration
+- fix ordering of swapping sellers
+- swap for reliability only after one month? (>21 ticks)
