@@ -161,8 +161,9 @@ class Economy(mesa.Model):
                     "price":lambda a: a.price,
                     "employees": lambda a: len(a.employees),
                     "demand": lambda a: a.fulfilled_demand,
-                    'vacancies': lambda a: a.opening,
+                    'vacancy': lambda a: a.opening_hist[-1],
                     'inventory': lambda a: a.inventory,
+                    'wage': lambda a: a.wage,
                 }
             }
         )
@@ -337,8 +338,7 @@ class Household(mesa.Agent):
         We know that price should be a function of 'marginal cost', which is not defined in the paper. The marginal cost of 63 goods is the wage, so let us assume the marginal cost of one good is wage/63. We know that 63*price (which is 1)/price_low is the ceiling wage; if divided by price_high, it's the floor wage. So we take the average of the two and use that as the denominator.
         We can add noise to each agent's attributes, but the mean should be this. 
         '''
-        # DEBUG
-        self.money = self.wage_r*10
+        self.money = 1e4
         self.model.counter += 1
     def initialize_reservation(self, init_wage_r, tech_param, days_in_month):
         if init_wage_r > 0.6:
@@ -495,7 +495,6 @@ class Firm(mesa.Agent):
         self.planned_firing = False
         self.retained = 0
     def initialize_price_wage(self, tech_param, days_in_month, price_low, price_high):
-        # See Household.initialize_money() for explanation.
         self.price=1
         real_output_per_capita = tech_param * days_in_month
         self.wage = max(np.random.normal(0.3, 0.1), 0) * real_output_per_capita
@@ -588,7 +587,6 @@ class Firm(mesa.Agent):
                     if i == len(owners) - 1:
                         # Last shareholder gets remainder to ensure exact balance
                         share_amount = max(dividends - total_distributed, 0)
-                        print("paying last shareholder")
                     else:
                         share = shareholder.money/equity
                         share_amount = share * dividends
