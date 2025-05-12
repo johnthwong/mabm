@@ -286,12 +286,7 @@ class Economy(mesa.Model):
             
             self.datacollector.collect(self)
 class Household(mesa.Agent):
-    """
-    This is a singleton household.
-
-    Exogenous attributes (i.e., parameters):
-        H: 
-    """
+    # This is a singleton household.
     def __init__(self, model):
         # Initialize the parent class with relevant parameters.
         super().__init__(model)
@@ -411,7 +406,6 @@ class Household(mesa.Agent):
                 seller = self.sellers[seller_index]
                 max_buyable = self.money/seller.price
                 demand = min(self.day_consume - consumed, max_buyable)
-                seller.demand += demand
                 max_sellable = seller.inventory
                 if demand > max_sellable:
                     quantity = max_sellable
@@ -419,6 +413,7 @@ class Household(mesa.Agent):
                 else:
                     quantity = demand
                 seller.inventory -= quantity
+                seller.fulfilled_demand += quantity
                 consumed += quantity
                 dollars_transacted = quantity * seller.price
                 self.money -= min(dollars_transacted, self.money)
@@ -456,7 +451,7 @@ class Firm(mesa.Agent):
         self.opening_hist = []
         self.inventory = 0
         self.employees = []
-        self.demand = 0
+        self.fulfilled_demand = 0
         self.money = 0
         self.month_output = 0
         self.planned_firing = False
@@ -486,13 +481,13 @@ class Firm(mesa.Agent):
             price_chg_prob,
             max_price_chg,
             ):
-        if self.inventory < self.demand * inventory_low:
+        if self.inventory < self.fulfilled_demand * inventory_low:
             self.opening = True
             self.model.counter += 1
             if (self.price < self.wage * price_low) & incdf(price_chg_prob):
                 adjustment = random.uniform(0, max_price_chg)
                 self.price = self.price * (1 + adjustment)
-        if self.inventory > self.demand * inventory_high:
+        if self.inventory > self.fulfilled_demand * inventory_high:
             self.opening = False
             self.model.counter += 1
             if len(self.employees) > 0:
@@ -511,7 +506,7 @@ class Firm(mesa.Agent):
             self.model.counter += 1
     def reset_monthly_stats(self):
         self.month_output = 0
-        self.demand = 0
+        self.fulfilled_demand = 0
         self.model.counter += 1
     def do_finances(self, buffer, ownership="sovereign"):
         '''
