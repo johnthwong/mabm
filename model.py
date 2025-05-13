@@ -106,9 +106,11 @@ class Economy(mesa.Model):
         self.init_wage_r = init_wage_r
         self.lower_wage_r = lower_wage_r
         
-        # Create agents.
+        # Create households.
         Household.create_agents(model=self, n=self.H)
-        Firm.create_agents(model=self, n=self.F)
+
+        # Households create singleton firms.
+        self.agents_by_type[Household].do("initialize_firms")
         
         # Pair households to firms.
         self.agents_by_type[Household].shuffle_do("assign_firms", S=self.S)
@@ -262,6 +264,10 @@ class Household(mesa.Agent):
         self.blacklist = []
         self.day_consume = 0
         self.paystub = 0
+        
+        # Axtell parameters
+        self.tradeoff = random.uniform(0,1)
+        self.max_effort = 1
 
     def initialize_money(self):
         self.money = 1e4
@@ -361,6 +367,9 @@ class Household(mesa.Agent):
 
     # Labor market actions
 
+    def initialize_firms(self):
+        Firm.create_agents(model=self.model, n=1)
+
     def update_employment_hist(self):
         if self.employer is None:
             self.employment_hist.append(0)
@@ -431,6 +440,11 @@ class Firm(mesa.Agent):
         self.month_output = 0
         self.planned_firing = False
         self.retained = 0
+
+        # Axtell parameters
+        self.constant_r = random.uniform(0, 1/2)
+        self.increasing_r = random.uniform(3/4, 5/4)
+        self.team = random.uniform(3/2, 2)
 
     def initialize_price_wage(
         self,
