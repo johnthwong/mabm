@@ -105,53 +105,33 @@ class Economy(mesa.Model):
         self.buffer = buffer
         self.init_wage_r = init_wage_r
         self.lower_wage_r = lower_wage_r
-        # Debug
-        self.counter = 0
+        
         # Create agents.
         Household.create_agents(model=self, n=self.H)
         Firm.create_agents(model=self, n=self.F)
+        
         # Pair households to firms.
-        print("Running: assign_firms")
         self.agents_by_type[Household].shuffle_do("assign_firms", S=self.S)
-        print(f"Counter: {self.counter}")
-        if self.counter < self.H:
-            raise ValueError("Counter too low.")
-        self.counter = 0
 
         # Initialize reservation wage.
-        print("Running: initialize_reservation")
         self.agents_by_type[Household].do(
             "initialize_reservation",
             init_wage_r=self.init_wage_r,
             tech_param=self.tech_param,
             days_in_month=self.days_in_month,
         )
-        print(f"Counter: {self.counter}")
-        if self.counter < self.H:
-            raise ValueError("Counter too low.")
-        self.counter = 0
 
         # Initialize money.
-        print("Running: initialize_money")
         self.agents_by_type[Household].do(
             "initialize_money",
         )
-        print(f"Counter: {self.counter}")
-        if self.counter < self.H:
-            raise ValueError("Counter too low.")
-        self.counter = 0
 
         # Initialize price and wages.
-        print("Running: initialize_price_wage")
         self.agents_by_type[Firm].do(
             "initialize_price_wage",
             tech_param=self.tech_param,
             days_in_month=self.days_in_month,
         )
-        print(f"Counter: {self.counter}")
-        if self.counter < self.F:
-            raise ValueError("Counter too low.")
-        self.counter = 0
 
         # Instantiate DataCollector
         self.datacollector = mesa.DataCollector(
