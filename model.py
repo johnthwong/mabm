@@ -270,6 +270,8 @@ class Household(mesa.Agent):
         if init_wage_r > 0.6:
             raise Warning("Initial reservation wage might be too high.")
         self.wage_r = init_wage_r * tech_param * days_in_month
+    
+    # Consumption good market actions
 
     def assign_firms(self, S):
         # Assign seller firm relationships to households.
@@ -280,12 +282,6 @@ class Household(mesa.Agent):
         sellers = random.sample(all_firms, S)
         self.sellers = sellers
         self.blacklist = [0] * S
-
-    def update_employment_hist(self):
-        if self.employer is None:
-            self.employment_hist.append(0)
-        else:
-            self.employment_hist.append(1)
 
     def swap_for_reliability(self, swap_for_reliability_prob):
         if sum(self.blacklist) > 0:
@@ -316,43 +312,6 @@ class Household(mesa.Agent):
 
     def reset_blacklist(self, S):
         self.blacklist = [0] * S
-
-    def unemployed_search(self, applys):
-        if (self.employment_hist[-1] == 0) & (self.employer is None):
-            firms_applied = random.sample(self.model.agents_by_type[Firm], k=applys)
-            for firm in firms_applied:
-                if firm.opening > 0:
-                    if firm.wage > self.wage_r:
-                        self.employer = firm
-                        self.most_recent_employer = firm
-                        firm.employees.append(self)
-                        # Close the opening
-                        firm.opening -= 1
-
-                        break
-
-    def employed_search(self, quit_prob):
-        if self.employment_hist[-1] == 1:
-            if self.paystub < self.wage_r:
-                if incdf(quit_prob):
-                    all_sellers = self.model.agents_by_type[Firm]
-                    new_employers = [
-                        seller
-                        for seller in all_sellers
-                        if seller != self.most_recent_employer
-                    ]
-                    new_employer = random.choice(new_employers)
-                    if (new_employer.wage > self.paystub) & (new_employer.opening > 0):
-                        # Remove from old employer if still employed
-                        if self.employer is not None:
-                            self.employer.employees.remove(self)
-                        # Change household's attribute
-                        self.employer = new_employer
-                        self.most_recent_employer = new_employer
-                        # Add to new employer
-                        new_employer.employees.append(self)
-                        # Close the opening
-                        new_employer.opening -= 1
 
     def budget(self, aversion, S, days_in_month):
         total_price = sum(seller.price for seller in self.sellers)
@@ -399,6 +358,51 @@ class Household(mesa.Agent):
                 ):
 
                     break
+
+    # Labor market actions
+
+    def update_employment_hist(self):
+        if self.employer is None:
+            self.employment_hist.append(0)
+        else:
+            self.employment_hist.append(1)
+
+    def unemployed_search(self, applys):
+        if (self.employment_hist[-1] == 0) & (self.employer is None):
+            firms_applied = random.sample(self.model.agents_by_type[Firm], k=applys)
+            for firm in firms_applied:
+                if firm.opening > 0:
+                    if firm.wage > self.wage_r:
+                        self.employer = firm
+                        self.most_recent_employer = firm
+                        firm.employees.append(self)
+                        # Close the opening
+                        firm.opening -= 1
+
+                        break
+
+    def employed_search(self, quit_prob):
+        if self.employment_hist[-1] == 1:
+            if self.paystub < self.wage_r:
+                if incdf(quit_prob):
+                    all_sellers = self.model.agents_by_type[Firm]
+                    new_employers = [
+                        seller
+                        for seller in all_sellers
+                        if seller != self.most_recent_employer
+                    ]
+                    new_employer = random.choice(new_employers)
+                    if (new_employer.wage > self.paystub) & (new_employer.opening > 0):
+                        # Remove from old employer if still employed
+                        if self.employer is not None:
+                            self.employer.employees.remove(self)
+                        # Change household's attribute
+                        self.employer = new_employer
+                        self.most_recent_employer = new_employer
+                        # Add to new employer
+                        new_employer.employees.append(self)
+                        # Close the opening
+                        new_employer.opening -= 1
 
     def adjust_reservation(self, lower_wage_r):
         if (self.employment_hist[-1] == 1) & (self.paystub > self.wage_r):
