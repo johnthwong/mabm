@@ -10,6 +10,9 @@ import seaborn as sns
 import mesa
 import random
 
+# Optimization tool
+from scipy.optimize import minimize_scalar
+
 
 def incdf(cdf):
     # Returns true if random probability falls within cdf.
@@ -110,7 +113,16 @@ class Economy(mesa.Model):
         Household.create_agents(model=self, n=self.H)
 
         # Households create singleton firms.
-        self.agents_by_type[Household].do("initialize_firms")
+        self.agents_by_type[Household].do("initialize_singletons")
+
+        # Optimize effort
+        self.agents_by_type[Household].do("optimize_current")
+
+        # Connect labor market
+        self.agents_by_type[Household].shuffle_do("connect_labor_market")
+
+        # Make moves
+        self.agents_by_type[Household].shuffle_do("make_moves")
         
         # Pair households to firms.
         self.agents_by_type[Household].shuffle_do("assign_firms", S=self.S)
@@ -169,8 +181,10 @@ class Economy(mesa.Model):
         self.months += 1
 
     # This method represents all the action that takes place in one step of the model.
+        
+    # Start of month activities.
     def step(self):
-        # Start of month activities.
+
         print(f"Today is day {self.steps}.")
         if self.start():
             print("start of month.")
@@ -229,21 +243,19 @@ class Economy(mesa.Model):
             )
             # Firms reset their monthly statistics.
             self.agents_by_type[Firm].do("reset_monthly_stats")
+
         # Daily activities.
+
         # Households buy from firms to consume.
         self.agents_by_type[Household].shuffle_do("buy", browse=self.browse)
         # Firms then produce.
         self.agents_by_type[Firm].do("produce", tech_param=self.tech_param)
+
         # End of month activities.
         if self.end():
             # Firms pay employees (households).
-            self.agents_by_type[Firm].do("pay_employees", buffer=self.buffer)
-            # Firms pay shareholders (households).
-            self.agents_by_type[Firm].do("pay_shareholders")
-            # Households update their reservation wage.
-            self.agents_by_type[Household].do(
-                "adjust_reservation", lower_wage_r=self.lower_wage_r
-            )
+            self.agents_by_type[Firm].do("pay_employees")
+ 
             # Run datacollector at end of month (every 21st day).
             self.datacollector.collect(self)
 
@@ -268,6 +280,7 @@ class Household(mesa.Agent):
         # Axtell parameters
         self.tradeoff = random.uniform(0,1)
         self.max_effort = 1
+        self.labor_connections = random.randint(2, 6)
 
     def initialize_money(self):
         self.money = 1e4
@@ -367,8 +380,119 @@ class Household(mesa.Agent):
 
     # Labor market actions
 
-    def initialize_firms(self):
+    def initialize_singletons(self):
+        # This creates a firm and appends it to the Firm AgentSet.
         Firm.create_agents(model=self.model, n=1)
+        # Attach newest firm to household that created it.
+        firm = self.model.agents_by_type[Firm][-1]
+        self.employer = firm
+        # Attach self as employee
+        firm.employees.append(self)
+
+    def optimize_effort(self, firm, return_type):
+        colleagues = firm.employees.copy()
+        n = len(colleagues)
+        if n < 1:
+            raise ValueError("This firm has less than one employee.")
+        # Retrieve list of firm's employees without self.
+        if self in colleagues:
+            colleagues.remove(self)
+        other_efforts = sum([employee.effort for employee in colleagues])
+
+        # Define utility function
+        def utility(effort):
+            output = firm.constant_r * (effort + other_efforts) + pow(firm.increasing_r * (effort + other_efforts), firm.team)
+        
+            utility = pow(output/n, self.tradeoff) * pow(1 - effort, 1 - self.tradeoff)
+
+            return -utility
+        
+        result = minimize_scalar(utility, bounds=(0, 1), method='bounded')
+
+        if return_type == "effort":
+            return result.x
+        elif return_type == "utility":
+            return result.fun
+        else:
+            raise ValueError("No return_type specified.")
+
+    def optimize_current(self):
+        self.effort = self.optimize_effort(self.employer, return_type="effort")
+
+    def connect_labor_market(self):
+        if self.labor_connections >= self.model.H:
+            raise ValueError(
+                "Connections exceeds total number of other households."
+                )
+        households = self.model.agents_by_type[Household]
+        others = [household for household in households if household != self]
+        self.connections = random.sample(others, self.labor_connections)
+
+    def make_moves(self):
+        if self.connections is None:
+            raise ValueError(
+                "Labor connections is empty."
+            )
+        if self.employer is None:
+            raise ValueError(
+                "Household does not have an employer."
+            )
+
+        # 1. Gather options in network
+        firms_in_network = [friend.employer for friend in self.connections]
+        options = list(set(firms_in_network))
+
+        # 2. Add your own employer
+        current = self.employer
+        if current not in options:
+            options.append(current)
+        
+        # 3. Construct a startup
+        Firm.create_agents(model=self.model, n=1)
+        startup = self.model.agents_by_type[Firm][-1]
+        startup.employees.append(self)
+        options.append(startup)
+
+        # Loop optimize_effort.
+        utilities = []
+        for firm in options:
+            utility = self.optimize_effort(firm, return_type="utility")
+            utilities.append(utility)
+        
+        # Choose option with max utility.
+        max_utility = max(utilities)
+        best_index = utilities.index(max_utility)
+        choice = options[best_index]
+
+        # DELETE STARTUP IF NOT CHOSEN!!
+        if choice != startup:
+            startup.remove()
+
+        # Assign self to new firm if appropriate.
+        if (choice != current) and (choice != startup):
+            choice.employees.append(self)
+        
+        # Remove self from old firm if appropriate.
+        if choice != current:
+            current.employees.remove(self)
+            # Delete the firm if it has no more employees.
+            if not current.employees:
+                current.remove()
+
+        # Assign choice to current employer.
+        self.employer = choice
+
+        # Update effort.
+        self.effort = self.optimize_effort(choice, return_type="effort")
+
+        # Announce choice.
+        if choice == startup:
+            string = "started a new firm"
+        elif choice == current:
+            string = "stayed with old firm"
+        else:
+            string = "was poached"
+        print(f"Agent {self.unique_id} {string}.")
 
     def update_employment_hist(self):
         if self.employer is None:
@@ -412,14 +536,6 @@ class Household(mesa.Agent):
                         new_employer.employees.append(self)
                         # Close the opening
                         new_employer.opening -= 1
-
-    def adjust_reservation(self, lower_wage_r):
-        if (self.employment_hist[-1] == 1) & (self.paystub > self.wage_r):
-            self.wage_r = self.paystub
-
-        if self.employment_hist[-1] == 0:
-            self.wage_r = (1 - lower_wage_r) * self.wage_r
-
 
 class Firm(mesa.Agent):
     def __init__(self, model):
@@ -501,9 +617,9 @@ class Firm(mesa.Agent):
             fired.employer = None
             self.planned_firing = False
 
-    def produce(self, tech_param: float, tech_type="linear"):
-        if tech_type == "linear":
-            output = tech_param * len(self.employees)
+    def produce(self):
+        efforts = sum([employee.effort for employee in self.employees])
+        output = self.constant_r * efforts + pow(self.increasing_r * efforts, self.team)
         self.inventory += output
         self.month_output += output
 
@@ -511,45 +627,22 @@ class Firm(mesa.Agent):
         self.month_output = 0
         self.fulfilled_demand = 0
 
-    def pay_employees(self, buffer):
+    def pay_employees(self):
         # Pay employees.
+        if employee_count < 0:
+            raise ValueError("There's no employee to pay.")
         employee_count = len(self.employees)
-        wage_bill = employee_count * self.wage
-        if employee_count > 0:
-            wages_paid = min(wage_bill, self.money)
-            total_paid = 0
-            for i, employee in enumerate(self.employees):
-                if i == len(self.employees) - 1:
-                    # Last employee gets remainder to ensure exact balance
-                    payment = max(wages_paid - total_paid, 0)
-                else:
-                    payment = wages_paid / employee_count
-                    total_paid += payment
-                employee.money += payment
-                if employee.money < 0:
-                    raise ValueError("Money is negative after wage pmt.")
-                employee.paystub = payment
-            self.money -= wages_paid
-        self.retained = min(wage_bill * buffer, self.money)
-
-    def pay_shareholders(self):
-        # Pay shareholders.
-        dividends = max(self.money - self.retained, 0)
-        if dividends > 0:
-            owners = self.model.agents_by_type[Household]
-            equities = [owner.money for owner in owners]
-            equity = sum(equities)
-            total_distributed = 0
-            if equity > 0:
-                for i, shareholder in enumerate(owners):
-                    if i == len(owners) - 1:
-                        # Last shareholder gets remainder to ensure exact balance
-                        share_amount = max(dividends - total_distributed, 0)
-                    else:
-                        share = shareholder.money / equity
-                        share_amount = share * dividends
-                        total_distributed += share_amount
-                    shareholder.money += share_amount
-                    if shareholder.money < 0:
-                        raise ValueError("Money is negative after dividend pmt.")
-        self.money -= dividends
+        wages_paid = self.money 
+        total_paid = 0
+        for i, employee in enumerate(self.employees):
+            if i == len(self.employees) - 1:
+                # Last employee gets remainder to ensure exact balance.
+                payment = max(wages_paid - total_paid, 0)
+            else:
+                payment = wages_paid / employee_count
+                total_paid += payment
+            employee.money += payment
+            if employee.money < 0:
+                raise ValueError("Money is negative after wage pmt.")
+            employee.paystub = payment
+        self.money -= wages_paid

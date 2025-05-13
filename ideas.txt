@@ -1,0 +1,33 @@
+# Adopt Axtell for Lengnick
+
+- employees are paid
+	- equal shares 
+	- of produced value (quantity * price).
+		- **what if not all the output is sold end of month?** negative money?
+			- should workers account for price charged by firm before they jump?
+	- at end of month
+- thus:
+	- no owner class
+
+- firm determines only vacancies 
+- thus
+	- no wage parameter
+
+- firm determines price.
+
+- if worker is connected with a vacant firm, and determines they can produce more value (per worker) there, they move.
+- thus:
+	- no search intensity.
+
+- seller firms need to be reassigned after the start of every month.
+	- but what about network relationships?
+
+- produce once a month instead of every day.
+
+- other axtell features
+	- workers have productivity.
+	- firms have production function.
+	- workers value leisure.
+	- workers can work partial effort.
+		- workers can change effort.
+			- SOLVE THE DERIVATIVE? no.
