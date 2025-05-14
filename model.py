@@ -323,6 +323,8 @@ class Household(mesa.Agent):
                 new_seller = random.choices(new_sellers, weights=new_firm_weights, k=1)[0]
                 self.sellers.remove(old_seller)
                 self.sellers.append(new_seller)
+                if len(self.sellers) != len(set(self.sellers)):
+                    raise ValueError("Sellers list has duplicates.")
 
     def swap_for_price(self, swap_for_price_prob, min_savings):
         if incdf(swap_for_price_prob):
@@ -341,6 +343,8 @@ class Household(mesa.Agent):
                     # Update blacklist
                     del self.blacklist[old_seller_index]
                     self.blacklist.append(0)
+                    if len(self.sellers) != len(set(self.sellers)):
+                        raise ValueError("Sellers list has duplicates.")
 
     def reset_blacklist(self, S):
         self.blacklist = [0] * S
