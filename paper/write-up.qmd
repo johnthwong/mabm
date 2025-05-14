@@ -36,7 +36,7 @@ This project also makes several small contributions. First, it converts the @len
 
 [^6]: Though I should acknowledge that there are at least two other attempts on Github to replicate this exact model in Python, both with Mesa functionality. I found @alinnen94 early into my attempt. Their model could not replicate the endogenous business cycles that were core to the @lengnick model, so I decided to start from scratch. When I was wrapping up the project, that's when I encountered @newwayland's attempt of the same project. I have not tried running it, but they claim to have successfully replicated @lengnick's results.
 
-[^7]: Code is available on https://github.com/johnthwong/mabm.
+[^7]: Code is available on [https://github.com/johnthwong/mabm]( https://github.com/johnthwong/mabm).
 
 The report is structured as follows. In @sec-model, I will first review the key components in the @lengnick macroeconomic ABM. In @sec-implement, I discuss issues I encountered when implementing the model, including ambiguities in @lengnick and assumptions I have to make in response. @sec-output compares the output of my model to the original model. @sec-discuss discusses further issues with the model.
 
