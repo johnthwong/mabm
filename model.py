@@ -186,12 +186,14 @@ class Economy(mesa.Model):
 
             # Households recall whether they were employed last month.
             self.agents_by_type[Household].do("update_employment_hist")
+            
             # Firms set wages.
             self.agents_by_type[Firm].do(
                 "set_wage",
                 max_wage_chg=self.max_wage_chg,
                 slack=self.slack,
             )
+            
             # Only run this after the first month.
             if self.steps > 1:
                 # Firms execute planned firing.
@@ -206,27 +208,33 @@ class Economy(mesa.Model):
                     price_chg_prob=self.price_chg_prob,
                     max_price_chg=self.max_price_chg,
                 )
+                
                 # Households search for cheaper sellers (firms).
                 self.agents_by_type[Household].shuffle_do(
                     "swap_for_price",
                     swap_for_price_prob=self.swap_for_price_prob,
                     min_savings=self.min_savings,
                 )
+                
                 # Households search for sellers (firms) with more inventory.
                 self.agents_by_type[Household].shuffle_do(
                     "swap_for_reliability",
                     swap_for_reliability_prob=self.swap_for_reliability_prob,
                 )
+                
                 # Households reset their memory of which sellers had no stock.
                 self.agents_by_type[Household].do("reset_blacklist", S=self.S)
+            
             # Households search for jobs if unemployed.
             self.agents_by_type[Household].shuffle_do(
                 "unemployed_search", applys=self.applys
             )
+            
             # Households search for higher paying jobs if underpaid.
             self.agents_by_type[Household].shuffle_do(
                 "employed_search", quit_prob=self.quit_prob
             )
+            
             # Households plan consumption.
             self.agents_by_type[Household].do(
                 "budget",
@@ -234,23 +242,33 @@ class Economy(mesa.Model):
                 S=self.S,
                 days_in_month=self.days_in_month,
             )
+            
             # Firms reset their monthly statistics.
             self.agents_by_type[Firm].do("reset_monthly_stats")
+        
         # Daily activities.
-        # Households buy from firms to consume.
-        self.agents_by_type[Household].shuffle_do("buy", browse=self.browse)
+       
+        if self.steps > 1:
+            # Households buy from firms to consume.
+            self.agents_by_type[Household].shuffle_do("buy", browse=self.browse)
+        
         # Firms then produce.
         self.agents_by_type[Firm].do("produce", tech_param=self.tech_param)
+        
         # End of month activities.
         if self.end():
+            
             # Firms pay employees (households).
             self.agents_by_type[Firm].do("pay_employees", buffer=self.buffer)
+            
             # Firms pay shareholders (households).
             self.agents_by_type[Firm].do("pay_shareholders")
+            
             # Households update their reservation wage.
             self.agents_by_type[Household].do(
                 "adjust_reservation", lower_wage_r=self.lower_wage_r
             )
+            
             # Run datacollector at end of month (every 21st day).
             self.datacollector.collect(self)
 
