@@ -1,0 +1,45 @@
+---
+title: "A Macroeconomic Agent-Based Model"
+author: "John T.H. Wong"
+date: May 7 2025
+format: 
+  pdf:
+    documentclass: article
+    papersize: letter
+    fontsize: 12pt
+    geometry:
+      - margin=1in
+    link-citations: true
+    fig-pos: 'H'
+    tbl-pos: 'H'
+execute:
+  echo: false
+  message: false
+  warning: false
+number-sections: true
+---
+
+## Markdown
+
+Markdown is an easy to read and write text format:
+
+- It's _plain text_ so works well with version control
+- It can be **rendered** into HTML, PDF, and more
+- Learn more at: <https://quarto.org/docs/authoring/>
+
+## Code Cell
+
+Here is a Python code cell:
+
+```{python}
+import os
+os.cpu_count()
+```
+
+## Equation
+
+Use LaTeX to write equations:
+
+$$
+\chi' = \sum_{i=1}^n k_i s_i^2
+$$

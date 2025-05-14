@@ -19,12 +19,18 @@ def incdf(cdf):
     else:
         return False
 
-
 def employment(employer):
     if employer is None:
         return 0
     else:
         return 1
+
+# Functions for computing model-level moments
+def compute_employment(model):
+    employment_vector = [
+        employment(a.employer) for a in model.agents_by_type[Household]
+        ]
+    return sum(employment_vector)
 
 
 class Economy(mesa.Model):
@@ -135,6 +141,8 @@ class Economy(mesa.Model):
 
         # Instantiate DataCollector
         self.datacollector = mesa.DataCollector(
+            # `compute_employment` is the helper function defined above. Passed not as a string.
+            model_reporters={"employment": compute_employment},
             agent_reporters={"money": "money"},
             agenttype_reporters={
                 Household: {
