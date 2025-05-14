@@ -65,7 +65,7 @@ class Economy(mesa.Model):
         H: int = 1000,
         S: int = 7,
         max_wage_chg=0.019,
-        slack: int = 6,
+        slack: int = 24,
         inventory_low=0.25,
         inventory_high=1,
         price_low=1.025,
@@ -147,13 +147,13 @@ class Economy(mesa.Model):
             agenttype_reporters={
                 Household: {
                     "employment": lambda a: employment(a.employer),
+                    "full_demand": lambda a: a.month_consume,
                 },
                 Firm: {
                     "output": lambda a: a.month_output,
                     "price": lambda a: a.price,
                     "employees": lambda a: len(a.employees),
                     "fulfilled_demand": lambda a: a.fulfilled_demand,
-                    "full_demand": lambda a: a.full_demand,
                     "vacancy": lambda a: a.opening_hist[-1],
                     "inventory": lambda a: a.inventory,
                     "wage": lambda a: a.wage,
@@ -319,7 +319,8 @@ class Household(mesa.Agent):
                 new_sellers = [
                     seller for seller in all_sellers if seller not in self.sellers
                 ]
-                new_seller = random.choice(new_sellers)
+                new_firm_weights = [len(firm.employees) for firm in new_sellers]
+                new_seller = random.choices(new_sellers, weights=new_firm_weights, k=1)[0]
                 self.sellers.remove(old_seller)
                 self.sellers.append(new_seller)
 
@@ -327,10 +328,14 @@ class Household(mesa.Agent):
         if incdf(swap_for_price_prob):
             old_seller_index = random.randint(0, len(self.sellers) - 1)
             old_seller = self.sellers[old_seller_index]
-            weights = [len(firm.employees) for firm in self.sellers]
+            all_sellers = self.model.agents_by_type[Firm]
+            new_sellers = [
+                seller for seller in all_sellers if seller not in self.sellers
+            ]
+            weights = [len(firm.employees) for firm in new_sellers]
             if sum(weights) > 0:
-                new_seller = random.choices(self.sellers, weights=weights, k=1)[0]
-                if new_seller.price / old_seller.price - 1 < -min_savings:
+                new_seller = random.choices(new_sellers, weights=weights, k=1)[0]
+                if new_seller.price / old_seller.price - 1 <= -min_savings:
                     self.sellers.remove(old_seller)
                     self.sellers.append(new_seller)
                     # Update blacklist
@@ -346,9 +351,10 @@ class Household(mesa.Agent):
         if self.money < 0:
             raise ValueError("A household has negative money balance.")
         if self.money > avg_price:
-            self.day_consume = (self.money / avg_price) / days_in_month
+            self.month_consume = (self.money / avg_price)
         else:
-            self.day_consume = pow(self.money / avg_price, aversion) / days_in_month
+            self.month_consume = pow(self.money / avg_price, aversion)
+        self.day_consume = self.month_consume/days_in_month
 
     def buy(self, browse):
         if self.day_consume > 0:
@@ -433,10 +439,10 @@ class Household(mesa.Agent):
                         new_employer.opening -= 1
 
     def adjust_reservation(self, lower_wage_r):
-        if (self.employment_hist[-1] == 1) & (self.paystub > self.wage_r):
+        if (self.employer is not None) & (self.paystub > self.wage_r):
             self.wage_r = self.paystub
 
-        if self.employment_hist[-1] == 0:
+        if self.employer is None:
             self.wage_r = (1 - lower_wage_r) * self.wage_r
 
 
