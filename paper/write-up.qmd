@@ -42,7 +42,31 @@ The paper is structured as follows. In @sec-model, I will first review the key c
 
 ## Model {#sec-model}
 
-The @lengick MABM consists of two agent types---households and firms---interacting in two markets---that for consumer goods and labor. The model is best described from (i) how it is initialized and (ii) what a full step comprises.
+The @lengick MABM consists of two agent types---households and firms---interacting in two markets---that for consumer goods and labor. The model is best described from (i) how it is initialized and (ii) what a full step comprises. @tbl-known summarizes all known parameters.
+
+Table: Known parameters. {#tbl-known}
+
+| Parameter | Description | Value |
+|:---------|:--------------------------------------------------------|:--------:|
+| $H$ | Number of households. | 1000 |
+| $F$ | Number of firms.  | $H/10$ |
+| $n$ | Number of firms that household maintains in sellers network.  | $7$ |
+| $\gamma$ | Months of labor market slack until wage cut.  | $24$ |
+| $\delta$ | Upper-bound of wage adjustment.  | $0.019$ |
+| $\underline{\phi}$ | Minimum desirable inventory (multiplier on units of goods demanded). | 0.25 |
+| $\overline{\phi}$ | Maximum desirable inventory (multiplier on units of goods demanded). | 1 |
+| $\underline{\rho}$ | Minimum desirable price (multiplier on "marginal cost"). | 1.025 |
+| $\overline{\rho}$ | Maximum desirable inventory (multiplier on "marginal cost"). | 1.15 |
+| $\theta$ | Probability firm considers changing price. | 0.75 |
+| $\eta$ | Upper-bound of price adjustment. | 0.02 |
+| $\psi_p$ | Probability household tries to switch seller for price. | 0.25 |
+| $\psi_y$ | Probability household tries to switch seller for inventory. | 0.25 |
+| $\xi$ | Minimum price decrease required to switch seller. | 0.01 |
+| $\beta$ | Number of firms visited when unemployed. | 5 |
+| $\pi$ | Probability underpaid worker seeks new job. | 0.1 |
+| $\alpha$ | Parameter for maximum consumption. | 0.9 |
+| $\lambda$ | Production technology parameter. | 3 |
+| $\chi$ | Parameter for precautionary buffer (multiplier on total payroll). | 0.1 |
 
 ### Initialization
 
@@ -54,13 +78,15 @@ $H$ **singleton** households (indexed $h$) are first initialized,[^1] and then $
 
 Each household has a (monthly) reservation wage $w_{ht}$ that changes with time. This refers to the wage that households must be offered to take a job. For clarity, it is **not** an amount that households receive for being unemployed. The reservation wage is initially $w_{h0}$.
 
-Households are endowed with money $m_{ht}|_{t=0} = m_{h0}$. Each firm initially sets per-good price $m_{f0}$. and monthly wage $w_{f0}$.
+Households are endowed with money $m_{ht}|_{t=0} = m_{h0}$. Each firm initially sets per-good price $m_{f0}$. and monthly wage $w_{f0}$. There is no borrowing, i.e., agents cannot spend more than the money they have.
 
 ### One full step
 
-At the start of each month (i.e., on day $s$ where $s \ \% \ 21 = 1$), the following actions are taken:
+At the start of each month (i.e., on day $s$ where $s \ \% \ 21 = 1$), the following actions are taken before the day begins:
 
-- If a firm had a vacancy in the previous month, it adjusts wages upwards. Conversely, if it has had **no** vacancies for the previous six months. The adjustment is:
+#### Firm adjusts wage
+
+If a firm had a vacancy in the previous month, it adjusts wages upwards. Conversely, if it has had **no** vacancies for the previous $\gamma$ months. The adjustment is:
 
 $$
 \begin{aligned}
@@ -68,29 +94,152 @@ w_{ft} = w_{f,t-1} (1 \pm \mu)
 \\ \mu  \sim U_{0, \delta}.
 \end{aligned}
 $$
-* Firm makes production plans. Specifically, it adjusts the number of employees (or households) it employs. It does
 
-Table: Known parameters. {#tbl-known}
+#### Firm adjusts inventory {#sec-adjust-inv}
 
-| Parameter | Description | Value |
-|:---------|:--------------------------------------------------------|--------|
-| $H$ | Number of households. | 1000 |
-| $F$ | Number of firms.  | $H/10$ |
-| $n$ | Number of firms that household maintains in sellers network.  | $7$ |
-| $\delta$ | Upper-bound of wage adjustment.  | $0.019$ |
+A firm increases (reduces) the number of employees $l_{ft}$, i.e., households it employs by one employee if inventory $i_{ft}$ falls below (exceeds) $\underline{\phi}$ ($\bar{\phi}$) times previous month's demand, i.e.,
 
+$$
+\begin{aligned}
+i_{ft} <\underline{\phi} \cdot d_{t-1} \implies l_{ft} = l_{f, t-1} + 1
+\\ i_{ft} > \overline{\phi} \cdot d_{t-1} \implies l_{ft} = l_{f, t-1} - 1.
+\end{aligned}
+$$
+
+Firings happen with a one-month delay upon being planned. Within the month, the household will still work at the firm.
+
+#### Firm adjusts price {#sec-adjust-price}
+
+Prices are only raised (reduced) conditional on unsatisfactorily low (high) inventory as described above. In addition, there are two other conditions. Second, the price must be too low (high) relative to $\underline\rho$ ($\overline\rho$) times marginal cost $c_t$, i.e.,
+
+$$
+\begin{aligned}
+p_{f,t-1} <\underline{\rho}  c_t
+\\ p_{f,t-1} > \overline{\rho}  c_t.
+\end{aligned}
+$$
+
+The third condition is that a firm only considers changing price with $\theta$ probability, i.e., Calvo pricing.
+
+The price adjustment is randomly drawn and as follows:
+
+$$
+\begin{aligned}
+p_{ft} = p_{f,t-1} (1 + v)
+\\ v \sim U_{0, \eta}.
+\end{aligned}
+$$
+
+#### Household changes sellers for price {#sec-chg-seller-price}
+
+There is a $\psi_{p}$ probability that each household takes this action. Each household draws a random new firm to pair with. The odds of drawing the new firm is proportional to the number of employees the firm has. The household compares this to a random existing connection. If the former offers a relative decrease in price greater than $\xi$, it replaces the latter as a connected seller.
+
+#### Household changes sellers for inventory {#sec-chg-seller-inv}
+
+There is a $\psi_{y}$ probability that each household takes this action. Among existing connection that could not fully fulfill the household's demand last month, a random is replaced with a new firm.
+
+#### Household seeks new job if unemployed
+
+If a household is unemployed in the previous month, it visits $\beta$ firms. If the firm has a vacancy and their wage offer exceeds the household's reservation wage, the household takes the job and ends the search.
+
+Note that because firings happen with a delay, households that are fired might refuse to engage in job search even though they will lose their employer.
+
+#### Household seeks new job if employed but underpaid
+
+A household can be paid less than their reservation wage (due to a downward wage adjustment, as previously discussed). They do not quit. Instead, with probability $\pi$, they will seek **one** new random firm. If that firm has a vacancy and their wage offer exceeds the household's current wage, the household will change jobs. Note that the new wage could still be below reservation.
+
+#### Household plans consumption {#sec-plan-consumption}
+
+Household plans how much to consume over the course of a month according to the following equation:
+
+$$
+c_{ht} = \min [(\frac{m_{ht}}{\overline p_{ft}})^{\alpha}, \frac{m_{ht}}{\overline p_{ft}}],
+$$
+
+where $\overline p_{ft}$ is the average price of all sellers in the household's network and $0 < \alpha < 1$. Note that $\alpha$ makes the derivative of consumption to the money-price ratio higher for lower values, i.e., consumption increases with additional income more when a household is poor in real sense.
+
+Also note that the consumption equation only determines the maximum, which may or may not be binding. Consumption occurs daily. If the household matches with higher-priced connections more, they may end up buying less than $c_{ht}$.
+
+---
+
+The following actions are undertaken daily.
+
+#### Household buys (and consumes)
+
+Households buy $c_{ht}/21$ from connected firms, visited in a random order, each day. If the firm visited cannot satisfy all of the household's demand, it moves to the next firm. The household stops the visit loop if (i) 95 percent or more of its demand is satisfied or (ii) the household has no more money.
+
+#### Firm produces
+
+Firms produce daily according to the following linear production function:
+
+$$
+\begin{aligned}
+y_{fs} = \lambda l_{ft},
+\\ \implies  y_{ft} = 21 \cdot \lambda l_{ft}.
+\end{aligned}
+$$
+
+where $\lambda$ is a technology parameter and $l_{ft}$ is the number of employees employed that month. Thus, each household implicitly supplies one unit of labor daily. The output is added to the firm's inventory.
+
+---
+
+At the end of each month (i.e., on day $s$ where $s \ \% \ 21 = 0$), the following actions are taken after the end of day.
+
+#### Firm pays wages
+
+The firm pays each employee the same wage. Total payroll is:
+
+$$
+\min(l_{ft} w_{ft}, m_{ft}),
+$$
+
+i.e., employees can be underpaid.
+
+#### Firm retains buffer
+
+This amount is retained as the firm's money rather than returned to shareholders (see below). This is a precautionary retained profit for future wages and is determined by the multiplier $\chi$ on total payroll. The rule is:
+
+$$
+\min(\chi l_{ft} w_{ft},  m_{ft}).
+$$
+
+#### Firm pays shareholders
+
+Firm pays all remaining money back to shareholders as dividends. Each firm is owned by all households. For any given firm, the household's ownership share is equal to that household's money over the economy's total money, i.e., richer households receive more dividends.
+
+#### Household adjusts reservation wage
+
+If a household was unemployed this month, their reservation wage is lowered by 10 percent. If they were employed and their payment was higher than their reservation wage, they set their reservation wage equal to their latest wage.
+
+## Implementation issues  {#sec-implement}
+
+Omissions in the original paper makes recreation impossible. The first issue has to do with the initial step. Notice that initial day's consumption requires that firms have pre-existing inventory. Similarly, headcount and price adjustments require information about inventory and employees that do not exist initially. For simplicity, I did not assume a starting inventory. Instead, I have all households search for jobs as if they are unemployed, and firms are assumed to have unlimited openings on day 1 only. After pairing, households skip consumption and produce output for firms. Since households do not consume, firms will not make money, and thus households are unpaid for their labor on day 1. All planning steps other than wage-setting is skipped on day 1 (all firms will raise their wage once since they have vacancies that day). 
+
+The second issue has to do with unknown parameters. @tbl-unknown summarizes them. All omitted parameters are starting values. While it should be noted that starting parameters likely do not have on general patterns (this is because the model does equilbriate; and because @lengnick drops the first 100 years---or 25200 ticks---of results in a 600-year run), they do matter for replication. In lieu, I assume only households start with money and in equal amounts. Money stock does not matter as prices will adjust proportionally. Accordingly, I simply assume that initial wages is a low share of monthly output, and that the reservation wage is an even lower share to encourage initial employment.
 
 Table: Unknown parameters. {#tbl-unknown}
+
 | Parameter | Description | Value |
-|:---------|:--------------------------------------------------------|--------|
-| $w_{h0}$ | Initial reservation wage (monthly). | NA |
+|:-------|:-------------------------|:----------------------:|
+| $m_{h0}$ | Initial household money. | 10000 |
+| $w_{h0}$ | Initial reservation wage (monthly). | $(21 \cdot \lambda) \cdot 0.1$ |
+| $m_{f0}$ | Initial firm money (monthly). | 0 |
+| $p_{f0}$ | Initial price (per good). | 1 |
+| $w_{f0}$ | Initial wage (monthly). | $21 \cdot \lambda \cdot \min(0, N[0.3, 0.1])$ |
+|  | Randomization seed. | 1000 |
+| $\psi$ | Unknown parameter. | $0.25$ |
 
+It should also be noted that there is a parameter $\theta$ in @lengnick's parameter list, but that variable is not mentioned again or explained upon at all. Perhaps most important of all, I also do not know the seed that recreated the result---though this would not be helpful since the original model was written in Java.
 
+The third issue has to do with definitions, some of which are very integral to the model.
 
-## Implementation Issues {#sec-implement}
+i. @sec-adjust-inv mentions demand. But it is never clarified whether demand refers to last month's consumers' full demand, which is what the consumer planned to consume that day or what they can afford (whichever lower), or consumers' demand that the firm was able to fulfill. I assume the latter because the former definition can lead to overcounting of one person's demand at multiple firms.
+ii. @sec-adjust-price mentions marginal cost for wage calculation, but marginal cost is never defined. We know that the marginal cost of ***63 consumption goods*** ($21 \cdot \lambda$) is the cost of one worker, i.e., the firm's wage. But it is unclear how you can convert that to the per-good marginal cost. I simply use divide wage by 63 to approximate this variable.
+iii. It is unclear whether @sec-chg-seller-price and @sec-chg-seller-inv draw new sellers the same way. It is explicitly mentioned that for the former, the probability of a draw is scaled by firm's number of employees. But this is not addressed for the latter. I have assumed all non-connected firms are drawn with equal probability in the latter case.
+iv. I have assumed consumption goods and money to be continuous. Discretization is not mentioned in @lengnick.
 
-- $w_h, m_{h0}, m_{f0}, w_{f0}$ is never defined.
-- Some steps are skipped in the first instance.
-- Initial hiring assignment.
-- Initial production.
+The fourth issue is that some downward adjustments of wages and price are asymptotic to zero. I put a floor on these values of 1e-9 to ensure the firm does not permanently crash in either goods or labor market. 
 
+Finally, some of the equations are inconsistent. As mentioned in @sec-plan-consumption, putting a min on max consumption is unnecessary because consumers are already bounded by a hard budget constraint. Unemployed households are also modeled to be more selective than underpaid ones, since the latter will take a job below their reservation wage, but the former will not.
+
+# Results
