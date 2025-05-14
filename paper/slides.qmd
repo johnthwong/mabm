@@ -1,0 +1,258 @@
+---
+title: "Review and Replication of Lengnick (2013)'s Macroeconomic Agent-Based Model"
+author: "John T.H. Wong"
+date: May 14 2025
+format: 
+  beamer:
+    theme: default
+    include-in-header: 
+      text: |
+        \setbeamertemplate{footline}[frame number]
+    incremental: true
+execute:
+  echo: false
+  message: false
+  warning: false
+bibliography: citations.bib
+
+---
+
+## Introduction
+
+- Replicated @lengnick's macroeconomic agent-based model in Python with Mesa
+- Reproduced endogenous business cycles without growth or aggregate shocks
+- Reproduced various aggregate phenomena (Phillips curve, Beveridge curve)
+- Some deviations in frequency and severity of downturns, and firm-level decisions
+
+## Motivations for Agent-Based Macroeconomic Models
+
+- Allows heterogeneity in agents unlike structural VAR or traditional DSGE models
+- No assumptions of perfect foresight or equilibrium conditions unlike HANK models
+
+## Contributions
+
+- Converted @lengnick's Java model to Python in open-source repository
+- Clarified ambiguities and inconsistencies in the model
+- Added (skeletal) dashboard capabilities with Mesa's Solara-based modules
+
+## Model Overview
+
+- Two agent types: households and firms
+- Two markets: consumer goods and labor
+- Each step represents one day; 21 days = one month
+
+## Model Parameters
+
+```{r}
+source("analysis.R")
+```
+
+Key parameters:
+
+- $H = 1000$ households, $F = 100$ firms
+- $n = 7$ firms in household's seller network
+- Several other parameters governing price/wage adjustments, inventories, job search
+
+## Parameters table
+
+| Parameter | Description | Value |
+|:---------|:--------------------------------------------------------|:--------:|
+| $\gamma$ | Months of labor market slack until wage cut.  | $24$ |
+| $\delta$ | Upper-bound of wage adjustment.  | $0.019$ |
+| $\underline{\phi}$ | Minimum desirable inventory (multiplier on units of goods demanded). | 0.25 |
+| $\overline{\phi}$ | Maximum desirable inventory (multiplier on units of goods demanded). | 1 |
+| $\underline{\rho}$ | Minimum desirable price (multiplier on "marginal cost"). | 1.025 |
+| $\overline{\rho}$ | Maximum desirable price (multiplier on "marginal cost"). | 1.15 |
+| $\theta$ | Probability firm considers changing price. | 0.75 |
+| $\eta$ | Upper-bound of price adjustment. | 0.02 |
+| $\psi_p$ | Probability household tries to switch seller for price. | 0.25 |
+| $\psi_y$ | Probability household tries to switch seller for inventory. | 0.25 |
+| $\xi$ | Minimum price decrease required to switch seller. | 0.01 |
+| $\beta$ | Number of firms visited when unemployed. | 5 |
+| $\pi$ | Probability underpaid worker seeks new job. | 0.1 |
+| $\alpha$ | Parameter for maximum consumption. | 0.9 |
+| $\lambda$ | Production technology parameter. | 3 |
+| $\chi$ | Parameter for precautionary buffer (multiplier on total payroll). | 0.1 |
+
+## Monthly Actions: Firms
+
+At the start of each month, firms:
+
+1. Adjust wages based on vacancies
+2. Adjust headcount based on whether inventory falls within some target multiple of last period's demand
+3. Adjust prices, only if headcount was adjusted, and if it's not within some target multiple of marginal costs
+
+## Monthly Actions: Households
+
+At the start of each month, households:
+
+1. Update seller networks based on prices and inventory
+2. Seek new jobs if unemployed
+3. Possibly seek better jobs if employed but underpaid
+4. Plan consumption based on money and average prices
+
+## Daily Actions
+
+- Households buy and consume goods from their network
+- Firms produce according to production function: $y_{fs} = \lambda l_{ft}$
+
+## End of Month Actions
+
+- Firms pay wages to employees
+- Firms retain buffer for future wages
+- Firms pay dividends to shareholders (all households) 
+- Households adjust reservation wages
+
+## Implementation Challenges
+
+::: {.nonincremental}
+
+- Omissions in original paper made replication difficult:
+  - Initial step not specified
+  - Unknown initial parameters (initial money, wages, prices)
+  - Unclear definitions (demand, marginal cost)
+  
+:::
+
+## Results: Business Cycles Comparison
+
+::: {.columns}
+::: {.column width="48%"}
+**My Replication**
+```{r}
+unemp_plot
+```
+:::
+
+::: {.column width="48%"}
+**Lengnick (2013)**
+![](../../lengnick_graphs/Screenshot 2025-05-14 at 08.36.59.png){width="100%"}
+:::
+:::
+
+## Results: Unsatisfied Demand Comparison
+
+::: {.columns}
+::: {.column width="48%"}
+**My Replication**
+```{r}
+unfulfilled_plot
+```
+:::
+
+::: {.column width="48%"}
+**Lengnick (2013)**
+![](../../lengnick_graphs/Screenshot 2025-05-14 at 08.37.36.png){width="100%"}
+:::
+:::
+
+## Results: Phillips Curve Comparison
+
+::: {.columns}
+::: {.column width="48%"}
+**My Replication**
+```{r}
+phillips_plot
+```
+:::
+
+::: {.column width="48%"}
+**Lengnick (2013)**
+![](../../lengnick_graphs/Screenshot 2025-05-14 at 08.38.03.png){width="100%"}
+:::
+:::
+
+## Results: Beveridge Curve Comparison
+
+::: {.columns}
+::: {.column width="48%"}
+**My Replication**
+```{r}
+beveridge_plot
+```
+:::
+
+::: {.column width="48%"}
+**Lengnick (2013)**
+![](../../lengnick_graphs/Screenshot 2025-05-14 at 08.38.14.png){width="100%"}
+:::
+:::
+
+## Results: Firm Size Distribution Comparison
+
+::: {.columns}
+::: {.column width="48%"}
+**My Replication**
+```{r}
+size_plot
+```
+:::
+
+::: {.column width="48%"}
+**Lengnick (2013)**
+![](../../lengnick_graphs/Screenshot 2025-05-14 at 08.38.28.png){width="100%"}
+:::
+:::
+
+## Results: Price Change Distribution Comparison
+
+::: {.columns}
+::: {.column width="48%"}
+**My Replication**
+```{r}
+firms_changing_price_plot_3
+```
+:::
+
+::: {.column width="48%"}
+**Lengnick (2013)**
+![](../../lengnick_graphs/Screenshot 2025-05-14 at 08.38.38.png){width="100%"}
+:::
+:::
+
+## Results: Cross Correlations Comparison
+
+::: {.columns}
+::: {.column width="48%"}
+**My Replication**
+```{r}
+ccf_plot
+```
+:::
+
+::: {.column width="48%"}
+**Lengnick (2013)**
+![](../../lengnick_graphs/Screenshot 2025-05-14 at 11.19.44.png){width="100%"}
+:::
+:::
+
+## Key Differences in Results {incremental=false}
+
+::: {.nonincremental}
+
+- **Business cycles**: Less frequent but more severe in my replication
+  - 10% unemployment vs. 4.5% in original
+
+- **Unsatisfied demand**: Similar mode but fatter tails in replication
+
+- **Phillips and Beveridge curves**: Similar patterns but different scales
+  - Price changes mostly within $±1$ vs. $±4$ in original
+  - Fewer vacancies in replication (max 20 vs. 80)
+
+- **Price changes**: My distribution is multimodal with second peak at ~75%
+
+- **Cross-correlations**: Negative correlation with price lags persists longer (18 months vs. 6 months)
+
+:::
+
+## Discussion
+
+- Model has large parameter space despite "baseline" intent
+  - 19 known + 6 unknown parameters
+  - Many parameters difficult to estimate from real data
+
+- Disequilibrium core to model makes some extensions difficult
+
+- What I want to add next: modify search behaviors to incorporate tax policies and integrate model with tax calculators for policy forecasting
+
+## References

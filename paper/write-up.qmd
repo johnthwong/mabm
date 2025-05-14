@@ -1,7 +1,7 @@
 ---
-title: "A Macroeconomic Agent-Based Model"
+title: "Review and Replication of Lengnick (2013)'s Macroeconomic Agent-Based Model"
 author: "John T.H. Wong"
-date: May 7 2025
+date: May 14 2025
 format: 
   pdf:
     documentclass: article
@@ -22,27 +22,27 @@ bibliography: citations.bib
 
 ## Introduction
 
-In this paper, I replicate @lengnick's macroeconomic agent-based model in Python with the Mesa library. The original model is written in Java not open-source.
+In this report, I review and replicate @lengnick's macroeconomic agent-based model in Python with the Mesa library [@mesa].[^7] I am able to reproduce endogenous business cycles in an economy without growth or shocks implemented at the aggregate level. Most aggregate phenomena, such as Phillips and Beveridge curves, resemble those found in the original paper. Though there are some deviations, particularly in the frequency and severity of downturns, and in the magnitude and frequency of firm-level decisions such as price changes.
 
-why abm
+There are several core reasons to model macroeconomic phenomena with agent-based computation. Compared to structural VAR or traditional DSGE models, ABMs are one of a few approaches that permits heterogeneity in agents. Compared with heterogeneous agent models such as HANK models, ABMs assume neither perfect foresight among agents nor equilibrium conditions in aggregate that are necessary to solve these alternative approaches. 
 
-why lengnick
+Among macroeconomic ABMs, the @lengnick model is relatively influential despite its simplicity [@dawid_agent-based_2018]. @lengnick intended the model to be a *baseline* that is absolutely necessary to generate business cycles without shocks. This has the advantages of, first, being computationally less intensive than other macroeconomic ABMs.[^5] Second, the supposedly smaller parameter space makes the model easier to estimate for applied use.[^4]
 
-- baseline
+[^5]: A 600-year run (with each step being a day) takes about eight minutes to complete on my 2020 Macbook Air with an 8-core CPU and 8 GB of RAM.
 
-contributions
+[^4]: Though I will argue later that the parameter space is not that small.
 
-- java
-- open-source
-- baseline 
-- clarify the model
-- dashboard functionality
+This project also makes several small contributions. First, it converts the @lengnick's original model, which was written in Java, to Python in an open-source repository.[^6] Second, I clarify ambiguities and inconsistencies in the model. Finally, I also added rudimentary dashboard capabilities with Mesa's Solara-based modules. Though they are too slow to update to be practical to use for these 100,000-step runs.
 
-The paper is structured as follows. In @sec-model, I will first review the key components in the @lengnick MABM. In @sec-implment, I discuss issues I encountered when implementing the model, including ambiguities in @lengick and assumptions I have to make in response. @sec-output compares the output of my model to the original model. @sec-discuss discusses further issues with the model.
+[^6]: Though I should acknowledge that there are at least two other attempts on Github to replicate this exact model in Python, both with Mesa functionality. I found @alinnen94 early into my attempt. Their model could not replicate the endogenous business cycles that were core to the @lengnick model, so I decided to start from scratch. When I was wrapping up the project, that's when I encountered @newwayland's attempt of the same project. I have not tried running it, but they claim to have successfully replicated @lengnick's results.
+
+[^7]: Code is available on https://github.com/johnthwong/mabm.
+
+The report is structured as follows. In @sec-model, I will first review the key components in the @lengnick macroeconomic ABM. In @sec-implement, I discuss issues I encountered when implementing the model, including ambiguities in @lengnick and assumptions I have to make in response. @sec-output compares the output of my model to the original model. @sec-discuss discusses further issues with the model.
 
 ## Model {#sec-model}
 
-The @lengick MABM consists of two agent types---households and firms---interacting in two markets---that for consumer goods and labor. The model is best described from (i) how it is initialized and (ii) what a full step comprises. @tbl-known summarizes all known parameters.
+The @lengnick macroeconomic ABM consists of two agent types---households and firms---interacting in two markets---that for consumer goods and labor. The model is best described from (i) how it is initialized and (ii) what a full step comprises. @tbl-known summarizes all known parameters.
 
 Table: Known parameters. {#tbl-known}
 
@@ -56,7 +56,7 @@ Table: Known parameters. {#tbl-known}
 | $\underline{\phi}$ | Minimum desirable inventory (multiplier on units of goods demanded). | 0.25 |
 | $\overline{\phi}$ | Maximum desirable inventory (multiplier on units of goods demanded). | 1 |
 | $\underline{\rho}$ | Minimum desirable price (multiplier on "marginal cost"). | 1.025 |
-| $\overline{\rho}$ | Maximum desirable inventory (multiplier on "marginal cost"). | 1.15 |
+| $\overline{\rho}$ | Maximum desirable price (multiplier on "marginal cost"). | 1.15 |
 | $\theta$ | Probability firm considers changing price. | 0.75 |
 | $\eta$ | Upper-bound of price adjustment. | 0.02 |
 | $\psi_p$ | Probability household tries to switch seller for price. | 0.25 |
@@ -86,7 +86,7 @@ At the start of each month (i.e., on day $s$ where $s \ \% \ 21 = 1$), the follo
 
 #### Firm adjusts wage
 
-If a firm had a vacancy in the previous month, it adjusts wages upwards. Conversely, if it has had **no** vacancies for the previous $\gamma$ months. The adjustment is:
+If a firm had a vacancy in the previous month, it adjusts wages upwards. Conversely, if it has had **no** vacancies for the previous $\gamma$ months, it adjusts wages downwards. The symmetric adjustment is:
 
 $$
 \begin{aligned}
@@ -97,7 +97,7 @@ $$
 
 #### Firm adjusts inventory {#sec-adjust-inv}
 
-A firm increases (reduces) the number of employees $l_{ft}$, i.e., households it employs by one employee if inventory $i_{ft}$ falls below (exceeds) $\underline{\phi}$ ($\bar{\phi}$) times previous month's demand, i.e.,
+A firm increases (reduces) the number of employees $l_{ft}$, i.e., households it employs by one employee if inventory $i_{ft}$ falls below (exceeds) $\underline{\phi}$ ($\overline{\phi}$) times previous month's demand, i.e.,
 
 $$
 \begin{aligned}
@@ -136,15 +136,15 @@ There is a $\psi_{p}$ probability that each household takes this action. Each ho
 
 #### Household changes sellers for inventory {#sec-chg-seller-inv}
 
-There is a $\psi_{y}$ probability that each household takes this action. Among existing connection that could not fully fulfill the household's demand last month, a random is replaced with a new firm.
+There is a $\psi_{y}$ probability that each household takes this action. Among existing connections that could not fully fulfill the household's demand last month, a random one is replaced with a new firm.
 
-#### Household seeks new job if unemployed
+#### Household seeks new job if unemployed {#sec-unemployed}
 
 If a household is unemployed in the previous month, it visits $\beta$ firms. If the firm has a vacancy and their wage offer exceeds the household's reservation wage, the household takes the job and ends the search.
 
 Note that because firings happen with a delay, households that are fired might refuse to engage in job search even though they will lose their employer.
 
-#### Household seeks new job if employed but underpaid
+#### Household seeks new job if employed but underpaid {#sec-underpaid}
 
 A household can be paid less than their reservation wage (due to a downward wage adjustment, as previously discussed). They do not quit. Instead, with probability $\pi$, they will seek **one** new random firm. If that firm has a vacancy and their wage offer exceeds the household's current wage, the household will change jobs. Note that the new wage could still be below reservation.
 
@@ -153,10 +153,10 @@ A household can be paid less than their reservation wage (due to a downward wage
 Household plans how much to consume over the course of a month according to the following equation:
 
 $$
-c_{ht} = \min [(\frac{m_{ht}}{\overline p_{ft}})^{\alpha}, \frac{m_{ht}}{\overline p_{ft}}],
+c_{ht} = \min [(\frac{m_{ht}}{\overline p_{ht}})^{\alpha}, \frac{m_{ht}}{\overline p_{ht}}],
 $$
 
-where $\overline p_{ft}$ is the average price of all sellers in the household's network and $0 < \alpha < 1$. Note that $\alpha$ makes the derivative of consumption to the money-price ratio higher for lower values, i.e., consumption increases with additional income more when a household is poor in real sense.
+where $\overline p_{ht}$ is the average price of all sellers in the household $h$'s network and $0 < \alpha < 1$. Note that $\alpha$ makes the derivative of consumption to the money-price ratio higher for lower values, i.e., consumption increases with additional income more when a household is poor in a real sense.
 
 Also note that the consumption equation only determines the maximum, which may or may not be binding. Consumption occurs daily. If the household matches with higher-priced connections more, they may end up buying less than $c_{ht}$.
 
@@ -213,13 +213,13 @@ If a household was unemployed this month, their reservation wage is lowered by 1
 
 ## Implementation issues  {#sec-implement}
 
-Omissions in the original paper makes recreation impossible. The first issue has to do with the initial step. Notice that initial day's consumption requires that firms have pre-existing inventory. Similarly, headcount and price adjustments require information about inventory and employees that do not exist initially. For simplicity, I did not assume a starting inventory. Instead, I have all households search for jobs as if they are unemployed, and firms are assumed to have unlimited openings on day 1 only. After pairing, households skip consumption and produce output for firms. Since households do not consume, firms will not make money, and thus households are unpaid for their labor on day 1. All planning steps other than wage-setting is skipped on day 1 (all firms will raise their wage once since they have vacancies that day). 
+Omissions in the original paper make recreation impossible. The first issue has to do with the initial step. Notice that initial day's consumption requires that firms have pre-existing inventory. Similarly, headcount and price adjustments require information about inventory and employees that do not exist initially. For simplicity, I did not assume a starting inventory. Instead, I have all households search for jobs as if they are unemployed, and firms are assumed to have unlimited openings on day 1 only. After pairing, households skip consumption and produce output for firms. Since households do not consume, firms will not make money, and thus households are unpaid for their labor on day 1. All planning steps other than wage-setting is skipped on day 1 (all firms will raise their wage once since they have vacancies that day). 
 
-The second issue has to do with unknown parameters. @tbl-unknown summarizes them. All omitted parameters are starting values. While it should be noted that starting parameters likely do not have on general patterns (this is because the model does equilbriate; and because @lengnick drops the first 100 years---or 25200 ticks---of results in a 600-year run), they do matter for replication. In lieu, I assume only households start with money and in equal amounts. Money stock does not matter as prices will adjust proportionally. Accordingly, I simply assume that initial wages is a low share of monthly output, and that the reservation wage is an even lower share to encourage initial employment.
+The second issue has to do with unknown parameters. @tbl-unknown summarizes them. All omitted parameters are starting values. While it should be noted that starting parameters likely do not have an effect on general patterns (this is because the model does equilibrate; and because @lengnick drops the first 100 years---or 25200 ticks---of results in a 600-year run), they do matter for replication. In lieu, I assume only households start with money and in equal amounts. Money stock does not matter as prices will adjust proportionally. Accordingly, I simply assume that initial wages is a low share of monthly output, and that the reservation wage is an even lower share to encourage initial employment.
 
 Table: Unknown parameters. {#tbl-unknown}
 
-| Parameter | Description | Value |
+| Parameter | Description | Value used in lieu |
 |:-------|:-------------------------|:----------------------:|
 | $m_{h0}$ | Initial household money. | 10000 |
 | $w_{h0}$ | Initial reservation wage (monthly). | $(21 \cdot \lambda) \cdot 0.1$ |
@@ -233,13 +233,152 @@ It should also be noted that there is a parameter $\theta$ in @lengnick's parame
 
 The third issue has to do with definitions, some of which are very integral to the model.
 
-i. @sec-adjust-inv mentions demand. But it is never clarified whether demand refers to last month's consumers' full demand, which is what the consumer planned to consume that day or what they can afford (whichever lower), or consumers' demand that the firm was able to fulfill. I assume the latter because the former definition can lead to overcounting of one person's demand at multiple firms.
-ii. @sec-adjust-price mentions marginal cost for wage calculation, but marginal cost is never defined. We know that the marginal cost of ***63 consumption goods*** ($21 \cdot \lambda$) is the cost of one worker, i.e., the firm's wage. But it is unclear how you can convert that to the per-good marginal cost. I simply use divide wage by 63 to approximate this variable.
-iii. It is unclear whether @sec-chg-seller-price and @sec-chg-seller-inv draw new sellers the same way. It is explicitly mentioned that for the former, the probability of a draw is scaled by firm's number of employees. But this is not addressed for the latter. I have assumed all non-connected firms are drawn with equal probability in the latter case.
+i. @sec-adjust-inv mentions demand. But it is never clarified whether demand refers to last month's consumers' full demand, which is what the consumer planned to consume that day or what they can afford (whichever lower), or consumers' demand that the firm was able to fulfill. I assume the latter because the former definition can lead to over-counting of one person's demand at multiple firms.
+ii. @sec-adjust-price mentions marginal cost for wage calculation, but marginal cost is never defined. We know that the marginal cost of ***63 consumption goods*** ($21 \cdot \lambda$) is the cost of one worker, i.e., the firm's wage. But it is unclear how you can convert that to the per-good marginal cost. I simply divide wage by 63 to approximate this variable.
+iii. It is unclear whether @sec-chg-seller-price and @sec-chg-seller-inv draw new sellers the same way. It is explicitly mentioned that for the former, the probability of a draw is scaled by firm's number of employees. But this is not addressed for the latter. I have assumed the probability for drawing non-connected firms is also scaled by number of employees in the latter case.
 iv. I have assumed consumption goods and money to be continuous. Discretization is not mentioned in @lengnick.
 
 The fourth issue is that some downward adjustments of wages and price are asymptotic to zero. I put a floor on these values of 1e-9 to ensure the firm does not permanently crash in either goods or labor market. 
 
 Finally, some of the equations are inconsistent. As mentioned in @sec-plan-consumption, putting a min on max consumption is unnecessary because consumers are already bounded by a hard budget constraint. Unemployed households are also modeled to be more selective than underpaid ones, since the latter will take a job below their reservation wage, but the former will not.
 
-# Results
+## Results
+
+In this section, I replicate @lengnick's attempt to replicate stylized macroeconomic facts. I simulate an economy with a seed of 1000 for 600 years, and drop the first 100.
+
+@fig-4b shows the last 50-year period within this window. I am able to replicate the core emergent phenomenon of the model: the endogenous generation of business cycles that are driven by coordination failures. For example, a firm can raise price too much and reduce the demand for its goods in the following period; this causes a cascade of the firm laying off a worker, that household consuming less, and another firm within the household's network cutting another worker, and so forth. 
+
+There are differences between the replication and the original: first, business cycles are far more frequent in @lengnick (eight in a 50-year period). Second, they are less severe in magnitude, with employed households in the period dropping to about 955 at most (about 4.5 percent unemployment), while my model generated a 10-percent unemployment rate within the period. In terms of matching reality, however, less frequent but more severe downturns seem more plausible.
+
+```{r source}
+source("analysis.R")
+```
+
+::: {#fig-4b fig-env="figure*"}
+
+```{r}
+unemp_plot
+```
+
+
+
+![](../../lengnick_graphs/Screenshot 2025-05-14 at 08.36.59.png){width="90%" fig-align="center"}
+
+Business cycles in employment.
+
+:::
+
+The next figure compares unsatisfied demand in both models. Specifically, one observation is the 1 - (aggregate fulfilled demand over aggregate planned demand) in a month.[^2] Note that while I am able to replicate a similar mode, my probability density function has fatter tails. But this could be due to original graph being truncated at 0.2. 
+
+Up next, I am also able to replicate aggregate correlations between price changes (year-over-year) and unemployment levels (Phillips curve, @fig-5a); and between vacancies and unemployment levels (Beveridge curve, @fig-5b). Each data point is one month with household- or firm-level statistics aggregated.[^3] Prices are first averaged across firms, and then first-differenced.
+
+[^2]: It is not entirely clear if this is how unsatisfied demand is defined in the original.
+
+[^3]: Like the original paper, I add noise to discrete unemployment and vacancy levels of $U[-0.5, 0.5]$ for better visualization.
+
+While patterns are largely the same, there are substantial deviations. First, as noted already, unemployment levels in my model are higher by about three times. Second, price changes in my model across year are mostly within one dollar, while many of @lengnick's reported price changes fall across [-4, 4] dollars. Third, my model produces less vacancies (consistent with more unemployment)---with maximum vacancies within a month to be no more than 20. Meanwhile, @lengnick reports more than 80 vacancies in some months.
+
+ 
+
+@fig-6a shows that I am able to replicate the distribution of firm sizes (measured by their fulfilled demand in the last step), though firms in my model exhibit higher variance by this measure. However, I am unable to replicate the distribution of "firms changing price" [@fig-6b]. While there is some ambiguity as to what the running variable means, I interpreted each data point as the share of firms that changed their price (binary) within a month. Note that my distribution is multimodal, with a second peak at about 75 percent---which is consistent with the price adjustment probability parameter $\theta$.
+
+Finally, I am unable to fully replicate the cross-correlation coefficients between output and the $k$-th lag of price levels. @fig-7a shows that within the range of lags @lengnick considers (eight quarters, or 24 months), (real) output is negatively correlated with lags of the price level, up to 18 months; whereas in @lengnick, output is negatively correlated with price level for up to 2 lagged quarters (6 months) only.
+
+
+::: {#fig-4a fig-env="figure*"}
+
+```{r}
+unfulfilled_plot
+```
+
+
+
+![](../../lengnick_graphs/Screenshot 2025-05-14 at 08.37.36.png){width="90%" fig-align="center"}
+
+Aggregate unsatisfied demand. Each data point is one month.
+
+:::
+
+::: {#fig-5a fig-env="figure*"}
+
+```{r}
+phillips_plot
+```
+
+
+
+![](../../lengnick_graphs/Screenshot 2025-05-14 at 08.38.03.png){height="50%" fig-align="center"}
+
+Phillips curve. Each data point is one month.
+
+:::
+
+::: {#fig-5b fig-env="figure*"}
+
+```{r}
+beveridge_plot
+```
+
+
+
+![](../../lengnick_graphs/Screenshot 2025-05-14 at 08.38.14.png){height="50%" fig-align="center"}
+
+Beveridge curve. Each data point is one month.
+
+:::
+
+::: {#fig-6a fig-env="figure*"}
+
+```{r}
+size_plot
+```
+
+
+
+![](../../lengnick_graphs/Screenshot 2025-05-14 at 08.38.28.png){width="90%" fig-align="center"}
+
+Firm's fulfilled demand. Each data point is one firm the last recorded step.
+
+:::
+
+::: {#fig-6b fig-env="figure*"}
+
+```{r}
+firms_changing_price_plot_3
+```
+
+
+
+![](../../lengnick_graphs/Screenshot 2025-05-14 at 08.38.38.png){width="90%" fig-align="center"}
+
+Share of firms that changed their prices. Each data point is one month.
+
+:::
+
+::: {#fig-7a fig-env="figure*"}
+
+```{r}
+ccf_plot
+```
+
+
+
+![](../../lengnick_graphs/Screenshot 2025-05-14 at 11.19.44.png){width="90%" fig-align="center"}
+
+Cross correlations. Each correlation coefficient is calculated with a sample where each data point is a month. Shaded area in the top graph is defined by the x-axis range of the bottom graph. Dashed lines in the top graph indicate a range of bootstrapped estimates within ± 2 SD.
+
+:::
+
+## Discussion
+
+I would like to discuss the properties of the @lengnick model that are unrelated to the implementation issues discussed in @sec-implement. 
+
+First, while the model is intended to be a *baseline* macroeconomic MABM, the parameter space is quite large and difficult to parameterize. The large number of parameters (19 known + 6 unknown) makes conducting a parameter sweep computationally unfeasible. It is unlikely that some parameters, like $\psi_p, \psi_y, \xi$ can be structurally estimated with real data. The parameters such as $\underline \phi, \overline \phi, \underline \rho, \overline \rho$ appear to presume equilibrium relationships between variables from the onset, but simply expand this equilibrium from a point to a range. Parameters like $\theta, \xi$ are likely redundant since they, respectively, have similar effects to $\underline \rho, \overline \rho$ and $\psi_p$.
+
+Second, one potential addition to the model to have it generate policy-relevant conclusions (e.g., the models described in @richiardi_back_nodate) is to modify the search behaviors in @sec-unemployed and @sec-underpaid by having households compare their reservation wage to *after-tax* wage. Then, a policy shock can modify the effective average tax rate after the model has reached equilibrium without the shock (in about year 200), and we record the following 10-30 years of outcomes immediately after. That way forecasts of policy effects would include the coordination issues caused by policy shocks. By integrating an open-source calculator (e.g., @pengine) that converts law-level parameters (e.g., standard deduction) to individual-specific average tax rates, one can potentially forecast the effect of real policy changes in a baseline environment where growth is absent.
+
+Finally, the disequilibrium that is core to generating the model's endogenous business cycles makes integrating certain components difficult. I had mostly implemented model firm entries and exits with @axtell_120_2016's model of employees with heterogeneous ability optimizing efforts in the presence of increasing returns to firm size. But the lack of equilibrium in this model's goods market makes output-based compensation (which implicitly assumes all produced goods are sold, or no inventory) in @axtell_120_2016 impossible to justify.
+
+\newpage
+
+## References
