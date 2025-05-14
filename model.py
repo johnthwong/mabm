@@ -152,7 +152,8 @@ class Economy(mesa.Model):
                     "output": lambda a: a.month_output,
                     "price": lambda a: a.price,
                     "employees": lambda a: len(a.employees),
-                    "demand": lambda a: a.fulfilled_demand,
+                    "fulfilled_demand": lambda a: a.fulfilled_demand,
+                    "full_demand": lambda a: a.full_demand,
                     "vacancy": lambda a: a.opening_hist[-1],
                     "inventory": lambda a: a.inventory,
                     "wage": lambda a: a.wage,
@@ -341,6 +342,7 @@ class Household(mesa.Agent):
                 seller = self.sellers[seller_index]
                 max_buyable = self.money / seller.price
                 demand = min(self.day_consume - consumed, max_buyable)
+                seller.full_demand += demand
                 max_sellable = seller.inventory
                 if demand > max_sellable:
                     quantity = max_sellable
@@ -435,6 +437,7 @@ class Firm(mesa.Agent):
         self.inventory = 0
         self.employees = []
         self.fulfilled_demand = 0
+        self.full_demand = 0
         self.money = 0
         self.month_output = 0
         self.planned_firing = False
@@ -504,6 +507,7 @@ class Firm(mesa.Agent):
     def reset_monthly_stats(self):
         self.month_output = 0
         self.fulfilled_demand = 0
+        self.full_demand = 0
 
     def pay_employees(self, buffer):
         # Pay employees.
