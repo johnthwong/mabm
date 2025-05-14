@@ -1,0 +1,96 @@
+---
+title: "A Macroeconomic Agent-Based Model"
+author: "John T.H. Wong"
+date: May 7 2025
+format: 
+  pdf:
+    documentclass: article
+    papersize: letter
+    fontsize: 12pt
+    geometry:
+      - margin=1in
+    link-citations: true
+    fig-pos: 'H'
+    tbl-pos: 'H'
+execute:
+  echo: false
+  message: false
+  warning: false
+number-sections: true
+bibliography: citations.bib
+---
+
+## Introduction
+
+In this paper, I replicate @lengnick's macroeconomic agent-based model in Python with the Mesa library. The original model is written in Java not open-source.
+
+why abm
+
+why lengnick
+
+- baseline
+
+contributions
+
+- java
+- open-source
+- baseline 
+- clarify the model
+- dashboard functionality
+
+The paper is structured as follows. In @sec-model, I will first review the key components in the @lengnick MABM. In @sec-implment, I discuss issues I encountered when implementing the model, including ambiguities in @lengick and assumptions I have to make in response. @sec-output compares the output of my model to the original model. @sec-discuss discusses further issues with the model.
+
+## Model {#sec-model}
+
+The @lengick MABM consists of two agent types---households and firms---interacting in two markets---that for consumer goods and labor. The model is best described from (i) how it is initialized and (ii) what a full step comprises.
+
+### Initialization
+
+Each step represents a day. One month (denoted as $t$) elapses after every 21 days.
+
+$H$ **singleton** households (indexed $h$) are first initialized,[^1] and then $F$ firms (indexed $f$). Each household forms a network of $n$ firms, from which the household will buy consumption goods when the model runs. Here I should note that all households and firms are permanent; there is no births or deaths for households, or entries or exits for firms.
+
+[^1]: All households are singleton. They are called households throughout @lengnick. I adopt the same language.
+
+Each household has a (monthly) reservation wage $w_{ht}$ that changes with time. This refers to the wage that households must be offered to take a job. For clarity, it is **not** an amount that households receive for being unemployed. The reservation wage is initially $w_{h0}$.
+
+Households are endowed with money $m_{ht}|_{t=0} = m_{h0}$. Each firm initially sets per-good price $m_{f0}$. and monthly wage $w_{f0}$.
+
+### One full step
+
+At the start of each month (i.e., on day $s$ where $s \ \% \ 21 = 1$), the following actions are taken:
+
+- If a firm had a vacancy in the previous month, it adjusts wages upwards. Conversely, if it has had **no** vacancies for the previous six months. The adjustment is:
+
+$$
+\begin{aligned}
+w_{ft} = w_{f,t-1} (1 \pm \mu)
+\\ \mu  \sim U_{0, \delta}.
+\end{aligned}
+$$
+* Firm makes production plans. Specifically, it adjusts the number of employees (or households) it employs. It does
+
+Table: Known parameters. {#tbl-known}
+
+| Parameter | Description | Value |
+|:---------|:--------------------------------------------------------|--------|
+| $H$ | Number of households. | 1000 |
+| $F$ | Number of firms.  | $H/10$ |
+| $n$ | Number of firms that household maintains in sellers network.  | $7$ |
+| $\delta$ | Upper-bound of wage adjustment.  | $0.019$ |
+
+
+Table: Unknown parameters. {#tbl-unknown}
+| Parameter | Description | Value |
+|:---------|:--------------------------------------------------------|--------|
+| $w_{h0}$ | Initial reservation wage (monthly). | NA |
+
+
+
+## Implementation Issues {#sec-implement}
+
+- $w_h, m_{h0}, m_{f0}, w_{f0}$ is never defined.
+- Some steps are skipped in the first instance.
+- Initial hiring assignment.
+- Initial production.
+

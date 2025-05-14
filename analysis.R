@@ -1,5 +1,10 @@
 library(tidyverse)
 
+# Set the years to display for time series
+time_series_years = 50
+# Years to drop in sample
+drop_years = 100
+
 # Import household data
 hdata = read.csv("../output/hdata.csv")%>%
   pivot_wider(
@@ -14,7 +19,7 @@ unemp_data = hdata %>%
     employment = sum(employment)
   )  %>%
   # Years * Months
-  slice_tail(n = 12*50) %>%
+  slice_tail(n = 12*time_series_years) %>%
   mutate(
     month = row_number(),
     year = month/12
@@ -29,3 +34,12 @@ unemp_plot = unemp_data %>%
   )
 
 unemp_plot
+
+
+
+fdata = read.csv("../output/fdata.csv")%>%
+  pivot_wider(
+    id_cols = c("Step", "AgentID"),
+    names_from = variable,
+    values_from = value
+  )
