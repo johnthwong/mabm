@@ -51,7 +51,7 @@ Key parameters:
 
 - $H = 1000$ households, $F = 100$ firms
 - $n = 7$ firms in household's seller network
-- Several other parameters governing price/wage adjustments, inventories, job search
+- Dozens other parameters governing price/wage adjustments, inventories, job search
 
 ## Parameters table
 
@@ -89,7 +89,7 @@ At the start of each month, households:
 1. Update seller networks based on prices and inventory
 2. Seek new jobs if unemployed
 3. Possibly seek better jobs if employed but underpaid
-4. Plan consumption based on money and average prices
+4. Plan consumption based on money and average price within network
 
 ## Daily Actions
 
@@ -110,9 +110,20 @@ At the start of each month, households:
 - Omissions in original paper made replication difficult:
   - Initial step not specified
   - Unknown initial parameters (initial money, wages, prices)
+    - Thankfully starting values don't matter too much.
   - Unclear definitions (demand, marginal cost)
   
 :::
+
+## Example
+
+What price-adjustment looks like over the very long-term:
+
+```{r fig.height=4}
+wage_plot
+```
+
+We therefore remove the first 100 years of observations.
 
 ## Results: Business Cycles Comparison
 
@@ -245,14 +256,18 @@ ccf_plot
 
 :::
 
+::: {.nonincremental}
+
 ## Discussion
 
 - Model has large parameter space despite "baseline" intent
   - 19 known + 6 unknown parameters
   - Many parameters difficult to estimate from real data
 
-- Disequilibrium core to model makes some extensions difficult
+- Disequilibrium makes some extensions difficult
 
 - What I want to add next: modify search behaviors to incorporate tax policies and integrate model with tax calculators for policy forecasting
+
+:::
 
 ## References

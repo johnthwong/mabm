@@ -32,6 +32,10 @@ unemp_plot = unemp_data %>%
   labs(
     y = "Employed Households",
     x = "Years"
+  ) +
+  theme(
+    axis.title = element_text(size = 20),
+    axis.text = element_text(size = 18)
   )
   
 
@@ -63,6 +67,22 @@ fdata_series = fdata %>%
     wage = mean(wage)
   )
 
+wage_plot = fdata_series %>%
+  mutate(
+    month = row_number(),
+    year = month/12
+  ) %>%
+  ggplot(aes(x = year)) + 
+  geom_line(aes(y = wage)) +
+  labs(
+    x = "Year",
+    y = "Wage"
+  ) +
+  theme(
+    axis.title = element_text(size = 20),
+    axis.text = element_text(size = 18)
+  )
+
 full_series = fdata_series %>%
   select(-Step) %>%
   cbind(hdata_series, .) %>%
@@ -86,8 +106,11 @@ unfulfilled_plot = full_series %>%
   labs(
     y = "Probability density function",
     x = "Unsatisfied demand (in %)"
-  )# +
-  # scale_x_continuous(limits = c(0, 0.2))
+  ) +
+  theme(
+    axis.title = element_text(size = 20),
+    axis.text = element_text(size = 18)
+  )
 
 # Recreate Fig 7a.
 ccf = forecast::ggCcf(
@@ -97,7 +120,7 @@ ccf = forecast::ggCcf(
 ccf_plot = ccf +
   labs(
     title = "",
-    y = "Cross-correlation between output and lags of mean price",
+    y = "Cross-correlation btwn output and lags of mean price",
     x = "Lags of mean price (in months)"
   ) +
   annotate(
@@ -105,6 +128,10 @@ ccf_plot = ccf +
     xmin = -24, xmax = 24, 
     ymin = -Inf, ymax = Inf, 
     alpha = 0.2, fill = "blue"
+  ) +
+  theme(
+    axis.title = element_text(size = 20),
+    axis.text = element_text(size = 18)
   )
   
 
@@ -120,6 +147,10 @@ phillips_plot = full_series_noisy %>% ggplot(aes(x = price_chg_year, y = unemp))
   labs(
     y = "Unemployed households",
     x = "First-difference of mean price across firms"
+  ) +
+  theme(
+    axis.title = element_text(size = 20),
+    axis.text = element_text(size = 18)
   )
 
 
@@ -129,6 +160,10 @@ beveridge_plot = full_series_noisy %>% ggplot(aes(x = vacancy, y = unemp)) +
   labs(
     y = "Unemployed households",
     x = "Total vacancies"
+  ) +
+  theme(
+    axis.title = element_text(size = 20),
+    axis.text = element_text(size = 18)
   )
 
 # Recreate Fig 6a.
@@ -148,6 +183,10 @@ size_plot = fslice_data %>%
   labs(
     y = "Probability density function",
     x = "Firm's fulfilled demand as of the last recorded step"
+  ) +
+  theme(
+    axis.title = element_text(size = 20),
+    axis.text = element_text(size = 18)
   )
 
 size_plot
@@ -166,13 +205,21 @@ price_changed_data = fdata %>%
 
 firms_changing_price_plot_1 = price_changed_data %>% 
   ggplot(aes(x = price_chg_month_rel)) +
-  geom_density()
+  geom_density() +
+  theme(
+    axis.title = element_text(size = 20),
+    axis.text = element_text(size = 18)
+  )
 
 firms_changing_price_plot_2 = price_changed_data %>%
   group_by(AgentID) %>%
   slice_tail(n = 1) %>% 
   ggplot(aes(x = price_chg_month_rel)) +
-  geom_density()
+  geom_density() +
+  theme(
+    axis.title = element_text(size = 20),
+    axis.text = element_text(size = 18)
+  )
 
 firms_changing_price_plot_3 = price_changed_data %>%
   group_by(Step) %>%
@@ -180,5 +227,13 @@ firms_changing_price_plot_3 = price_changed_data %>%
     percent_who_changed_price = sum(price_changed)
   ) %>%
   ggplot(aes(x = percent_who_changed_price)) +
-  geom_density()
+  geom_density() +
+  theme(
+    axis.title = element_text(size = 20),
+    axis.text = element_text(size = 18)
+  ) +
+  labs(
+    y = "Probability density function",
+    x = "Percent of firms that changed price in a given month"
+  )
   

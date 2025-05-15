@@ -215,7 +215,16 @@ If a household was unemployed this month, their reservation wage is lowered by 1
 
 Omissions in the original paper make recreation impossible. The first issue has to do with the initial step. Notice that initial day's consumption requires that firms have pre-existing inventory. Similarly, headcount and price adjustments require information about inventory and employees that do not exist initially. For simplicity, I did not assume a starting inventory. Instead, I have all households search for jobs as if they are unemployed, and firms are assumed to have unlimited openings on day 1 only. After pairing, households skip consumption and produce output for firms. Since households do not consume, firms will not make money, and thus households are unpaid for their labor on day 1. All planning steps other than wage-setting is skipped on day 1 (all firms will raise their wage once since they have vacancies that day). 
 
-The second issue has to do with unknown parameters. @tbl-unknown summarizes them. All omitted parameters are starting values. While it should be noted that starting parameters likely do not have an effect on general patterns (this is because the model does equilibrate; and because @lengnick drops the first 100 years---or 25200 ticks---of results in a 600-year run), they do matter for replication. In lieu, I assume only households start with money and in equal amounts. Money stock does not matter as prices will adjust proportionally. Accordingly, I simply assume that initial wages is a low share of monthly output, and that the reservation wage is an even lower share to encourage initial employment.
+```{r source}
+source("analysis.R")
+```
+
+```{r fig-wage}
+#| fig-cap: 'Mean wage across the entire run.'
+wage_plot
+```
+
+The second issue has to do with unknown parameters. @tbl-unknown summarizes them. All omitted parameters are starting values. While it should be noted that starting parameters likely do not have an effect on general patterns (this is because the model does equilibrate, see @fig-wage; and because @lengnick drops the first 100 years---or 25200 ticks---of results in a 600-year run), they do matter for replication. In lieu, I assume only households start with money and in equal amounts. Money stock does not matter as prices will adjust proportionally. Accordingly, I simply assume that initial wages is a low share of monthly output, and that the reservation wage is an even lower share to encourage initial employment.
 
 Table: Unknown parameters. {#tbl-unknown}
 
@@ -250,10 +259,6 @@ In this section, I replicate @lengnick's attempt to replicate stylized macroecon
 
 There are differences between the replication and the original: first, business cycles are far more frequent in @lengnick (eight in a 50-year period). Second, they are less severe in magnitude, with employed households in the period dropping to about 955 at most (about 4.5 percent unemployment), while my model generated a 10-percent unemployment rate within the period. In terms of matching reality, however, less frequent but more severe downturns seem more plausible.
 
-```{r source}
-source("analysis.R")
-```
-
 ::: {#fig-4b fig-env="figure*"}
 
 ```{r}
@@ -280,7 +285,9 @@ While patterns are largely the same, there are substantial deviations. First, as
 
  
 
-@fig-6a shows that I am able to replicate the distribution of firm sizes (measured by their fulfilled demand in the last step), though firms in my model exhibit higher variance by this measure. However, I am unable to replicate the distribution of "firms changing price" [@fig-6b]. While there is some ambiguity as to what the running variable means, I interpreted each data point as the share of firms that changed their price (binary) within a month. Note that my distribution is multimodal, with a second peak at about 75 percent---which is consistent with the price adjustment probability parameter $\theta$.
+@fig-6a shows that I am able to replicate the distribution of firm sizes (measured by their fulfilled demand in the last step), though firms in my model exhibit higher variance by this measure. However, I am unable to replicate the distribution of "firms changing price" [@fig-6b]. While there is some ambiguity as to what the running variable means,[^8] I interpreted each data point as the share of firms that changed their price (binary) within a month. Note that my distribution is multimodal, with a second peak at about 75 percent---which is consistent with the price adjustment probability parameter $\theta$.
+
+[^8]: I also tried plotting the densities of relative change from last month's price, where each data point is (i) a firm in a month and (ii) a firm in the last run. Neither plots resemble the original graph.
 
 Finally, I am unable to fully replicate the cross-correlation coefficients between output and the $k$-th lag of price levels. @fig-7a shows that within the range of lags @lengnick considers (eight quarters, or 24 months), (real) output is negatively correlated with lags of the price level, up to 18 months; whereas in @lengnick, output is negatively correlated with price level for up to 2 lagged quarters (6 months) only.
 
